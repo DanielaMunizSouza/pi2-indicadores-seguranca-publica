@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ==========================================
+# PROJETO INTEGRADOR - DADOS
+# ==========================================
+
+# Dados brutos originais
+data/raw/
+
+# Arquivos temporários de processamento
+data/tmp/
+
+# Bancos de dados locais
+*.sqlite
+*.sqlite3
+*.db
+
+# Arquivos Excel temporários
+~$*.xlsx
+~$*.xls
+
+# Arquivos temporários do Windows
+Thumbs.db
