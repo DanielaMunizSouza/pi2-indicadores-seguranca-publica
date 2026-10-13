@@ -15,6 +15,7 @@ if _env_file.is_file():
         if _sep and _key.strip() and not _key.lstrip().startswith("#"):
             os.environ.setdefault(_key.strip(), _value.strip().strip("\"'").strip())
 DB_URL=os.getenv("DATABASE_URL","postgresql://postgres@localhost:5432/ProjetoIntergrador_2")
+MUNICIPIOS_SP=["S.PAULO","SAO PAULO","SÃO PAULO"]
 CATEGORIES={"objetos":"Objetos","celulares_subtraidos":"Celulares subtraídos","apreensao_entorpecente":"Apreensão de entorpecentes","entorpecentes_gramas":"Entorpecentes (gramas)","outros":"Outros"}
 app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1.0.0",description="Resumos agregados por período, categoria e localização.")
 
@@ -22,11 +23,16 @@ def connect():
     try: return psycopg.connect(DB_URL,connect_timeout=5,row_factory=dict_row)
     except psycopg.Error as exc: raise HTTPException(503,"Não foi possível conectar ao PostgreSQL. Confira DATABASE_URL e se o servidor está ativo.") from exc
 
-def make_where(start,end,cep,category):
+def make_where(start,end,cep,category,include_city=True):
     if start>end: raise HTTPException(400,"A data inicial deve ser anterior ou igual à data final.")
     if category and category not in CATEGORIES: raise HTTPException(400,"Categoria inválida.")
-    clauses=["municipio = %s","data_ocorrencia >= %s","data_ocorrencia <= %s"]
-    values:list[object]=["São Paulo",start,end]
+    # O arquivo SSP usa a abreviação "S.PAULO" no campo municipio.
+    clauses=[]
+    values:list[object]=[]
+    if include_city:
+        clauses.append("municipio = ANY(%s)"); values.append(MUNICIPIOS_SP)
+    clauses.extend(["data_ocorrencia >= %s","data_ocorrencia <= %s"])
+    values.extend([start,end])
     if cep:
         digits=re.sub(r"\D","",cep)
         if len(digits)!=8: raise HTTPException(400,"Digite um CEP com 8 dígitos.")
@@ -45,6 +51,12 @@ def status():
 
 @app.get("/api/categories")
 def categories(): return [{"value":k,"label":v} for k,v in CATEGORIES.items()]
+
+@app.get("/api/areas/geometry",include_in_schema=False)
+def area_geometry():
+    path=ROOT/"data"/"reference"/"distritos_sp.geojson"
+    if not path.is_file(): raise HTTPException(503,"Limites dos distritos não encontrados.")
+    return FileResponse(path,media_type="application/geo+json")
 
 @app.get("/api/summary")
 def summary(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31)),cep:str|None=None,category:str|None=None):
@@ -69,8 +81,28 @@ def summary(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31)),ce
         raise HTTPException(503,"Falha ao consultar os dados. Confira se o esquema foi criado.") from exc
     return {"total":total["total"],"com_cep":total["com_cep"],"com_coordenada":total["com_coordenada"],
       "centro":{"latitude":total["latitude"],"longitude":total["longitude"]},"mensal":monthly,
-      "categorias":[{"value":r["categoria_dado"],"label":CATEGORIES.get(r["categoria_dado"],r["categoria_dado"]),"registros":r["registros"]} for r in grouped],
+      "categorias":[{"value":r["categoria_dado"],"label":CATEGORIES.get(r["categoria_dado"],r["categoria_dado"]),"registros":r["total"]} for r in grouped],
       "periodo":{"inicio":start.isoformat(),"fim":end.isoformat()}}
+
+@app.get("/api/areas")
+def area_stats(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31)),
+               cep:str|None=None,category:str|None=None):
+    where,params=make_where(start,end,cep,category,include_city=False)
+    sql=f"""SELECT d.codigo_distrito AS codigo,d.nome_distrito AS distrito,d.regiao,
+                 COALESCE(c.registros,0) AS registros
+          FROM public.distrito_municipal_sp d
+          LEFT JOIN (
+            SELECT codigo_distrito,SUM(registros) AS registros
+            FROM public.resumo_distrito_diario WHERE {where}
+            GROUP BY codigo_distrito
+          ) c ON c.codigo_distrito=d.codigo_distrito
+          ORDER BY registros DESC,d.nome_distrito"""
+    try:
+        with connect() as conn: rows=conn.execute(sql,params).fetchall()
+    except psycopg.Error as exc:
+        raise HTTPException(503,"Falha ao agregar as ocorrências por distrito. Confira se os limites GeoSampa foram importados.") from exc
+    return {"unidade":"distrito","areas":[{"codigo":r["codigo"],"distrito":r["distrito"],
+      "regiao":r["regiao"],"registros":r["registros"]} for r in rows]}
 
 @app.get("/api/map")
 def map_cells(west:float,south:float,east:float,north:float,start:date=Query(date(2025,1,1)),

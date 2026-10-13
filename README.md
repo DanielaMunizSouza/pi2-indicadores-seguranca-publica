@@ -1,17 +1,18 @@
 # Indicadores de Segurança Pública — São Paulo
 
-Aplicação web para explorar registros públicos SSP-SP por CEP, categoria e período. O mapa apresenta concentração de registros agregados, não probabilidade de vitimização nem risco individual.
+Aplicação web para explorar registros públicos SSP-SP por CEP, categoria, período e distrito municipal. O mapa colore os 96 distritos oficiais com a contagem de ocorrências georreferenciadas que caem em cada limite. O número de registros não é uma taxa por habitante nem uma probabilidade de vitimização.
 
 ## Aplicação web
 
-1. Crie um arquivo .env a partir de .env.example e ajuste senha, porta, usuário e banco indicados no pgAdmin.
+1. Na raiz do projeto, crie `.env` a partir de `.env.example` e ajuste a conexão para a senha, porta, usuário e banco indicados no pgAdmin. A senha fica somente em `.env`, que é ignorado pelo Git. Se ela contiver caracteres reservados de URL, codifique-os (por exemplo, `@` como `%40`).
 2. No PowerShell na raiz do projeto:
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt -r requirements-web.txt
-$env:DATABASE_URL = "postgresql://postgres:SUA_SENHA@localhost:5432/ProjetoIntergrador_2"
+py scripts/importar_distritos_sp.py
+py scripts/atualizar_resumo_distritos.py
 py -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
@@ -25,11 +26,11 @@ GitHub não hospeda uma conexão PostgreSQL ao vivo. O repositório contém o es
 docker compose --env-file .env -f database/docker-compose.yml up -d
 ```
 
-Cada pessoa terá banco local. No arquivo .env, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Para preenchê-lo, é necessário obter os CSVs SSP-SP e seguir data/README.md.
+Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `py scripts/importar_distritos_sp.py` e `py scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
 
 ## Dados
 
-Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB por arquivo do GitHub. O banco local ocupa vários GB. Por isso, os arquivos e dumps não são versionados: o repositório inclui rotinas reproduzíveis para criação, importação e padronização. Execute database/schema.sql uma vez no banco vazio, configure DATABASE_URL e use:
+Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB por arquivo do GitHub. O banco local ocupa vários GB. Por isso, os arquivos e dumps não são versionados: o repositório inclui rotinas reproduzíveis para criação, importação e padronização. Execute `database/schema.sql` uma vez no banco vazio, configure DATABASE_URL e use:
 
 ```powershell
 py scripts/carregar_ssp.py --diretorio "data/raw/Dados Segurança Publica/SSP.SP/CSV"
@@ -39,4 +40,4 @@ O importador reprocessa cada arquivo em transação, sem alterar os originais, e
 
 ## Interpretação
 
-As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma linha. Nem todos os registros têm CEP ou coordenadas. A base não possui limites oficiais de CEP: o mapa agrega pontos em células espaciais.
+As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma linha. Nem todos os registros têm CEP ou coordenadas. O mapa atribui pontos georreferenciados aos distritos pelo PostGIS; os registros sem coordenada permanecem nos indicadores gerais, mas não podem ser contados por área. As cores são faixas relativas entre distritos para os filtros escolhidos, não taxas populacionais. Os distritos são limites administrativos oficiais, não polígonos de CEP ou bairros. A geometria de referência está em `data/reference/distritos_sp.geojson` e sua origem/licença estão documentadas em `data/reference/README.md`.

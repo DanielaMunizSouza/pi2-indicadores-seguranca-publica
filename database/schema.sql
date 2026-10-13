@@ -17,6 +17,26 @@ CREATE INDEX IF NOT EXISTS ix_registro_cep ON public.registro_ocorrencia(cep,dat
 CREATE INDEX IF NOT EXISTS ix_registro_municipio_data ON public.registro_ocorrencia(municipio,data_ocorrencia);
 CREATE INDEX IF NOT EXISTS ix_registro_categoria_data ON public.registro_ocorrencia(categoria_dado,data_ocorrencia);
 CREATE INDEX IF NOT EXISTS ix_registro_localizacao ON public.registro_ocorrencia USING gist(localizacao);
+CREATE TABLE IF NOT EXISTS public.distrito_municipal_sp (
+ codigo_distrito text PRIMARY KEY,
+ nome_distrito text NOT NULL,
+ regiao text,
+ atualizado_em date,
+ geometria geometry(MultiPolygon,4326) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_distrito_municipal_sp_geometria
+ ON public.distrito_municipal_sp USING gist(geometria);
+CREATE TABLE IF NOT EXISTS public.resumo_distrito_diario (
+ codigo_distrito text NOT NULL REFERENCES public.distrito_municipal_sp(codigo_distrito),
+ data_ocorrencia date NOT NULL,
+ categoria_dado text NOT NULL,
+ cep varchar(8) NOT NULL DEFAULT '',
+ registros bigint NOT NULL,
+ PRIMARY KEY(codigo_distrito,data_ocorrencia,categoria_dado,cep)
+);
+CREATE INDEX IF NOT EXISTS ix_resumo_distrito_periodo
+ ON public.resumo_distrito_diario(data_ocorrencia,codigo_distrito)
+ INCLUDE(categoria_dado,cep,registros);
 CREATE OR REPLACE VIEW public.vw_resumo_mensal AS
  SELECT date_trunc('month',data_ocorrencia)::date AS mes,municipio,categoria_dado,count(*) AS registros,
  count(*) FILTER(WHERE cep IS NOT NULL) AS registros_com_cep,count(*) FILTER(WHERE localizacao IS NOT NULL) AS registros_com_coordenada
