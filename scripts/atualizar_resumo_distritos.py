@@ -22,6 +22,8 @@ def main() -> None:
         conn.execute("""CREATE INDEX IF NOT EXISTS ix_resumo_distrito_periodo
             ON public.resumo_distrito_diario(data_ocorrencia,codigo_distrito)
             INCLUDE(categoria_dado,cep,registros)""")
+        conn.execute("""CREATE INDEX IF NOT EXISTS ix_resumo_distrito_cep
+            ON public.resumo_distrito_diario(cep) INCLUDE(codigo_distrito,registros)""")
         # TRUNCATE and rebuild happen in one transaction: readers see the old or
         # the complete new summary, never a partially populated table.
         conn.execute("TRUNCATE public.resumo_distrito_diario")

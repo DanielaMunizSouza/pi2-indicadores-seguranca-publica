@@ -97,11 +97,32 @@ def area_stats(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31))
             GROUP BY codigo_distrito
           ) c ON c.codigo_distrito=d.codigo_distrito
           ORDER BY registros DESC,d.nome_distrito"""
+    cep_area=None
+    cep_distrito=None
+    if cep:
+        cep_digitos=re.sub(r"\D","",cep)
     try:
-        with connect() as conn: rows=conn.execute(sql,params).fetchall()
+        with connect() as conn:
+            if cep:
+                cep_area=conn.execute("""SELECT d.codigo_distrito AS codigo,d.nome_distrito AS distrito
+                    FROM public.resumo_distrito_diario r
+                    JOIN public.distrito_municipal_sp d USING (codigo_distrito)
+                    WHERE r.cep=%s
+                    GROUP BY d.codigo_distrito,d.nome_distrito
+                    ORDER BY SUM(r.registros) DESC,d.nome_distrito
+                    LIMIT 1""",(cep_digitos,)).fetchone()
+            rows=conn.execute(sql,params).fetchall()
     except psycopg.Error as exc:
         raise HTTPException(503,"Falha ao agregar as ocorrências por distrito. Confira se os limites GeoSampa foram importados.") from exc
-    return {"unidade":"distrito","areas":[{"codigo":r["codigo"],"distrito":r["distrito"],
+    if cep and cep_area:
+        # Coordenadas históricas de um CEP podem cair em distritos diferentes.
+        # Use o distrito mais frequente no histórico e reúna nele os registros
+        # do filtro atual, evitando que um mesmo CEP pinte áreas concorrentes.
+        total_cep=sum(r["registros"] for r in rows)
+        cep_distrito={"codigo":cep_area["codigo"],"distrito":cep_area["distrito"],
+            "criterio":"maior concentração histórica de coordenadas do CEP"}
+        rows=[{**r,"registros":total_cep if r["codigo"]==cep_area["codigo"] else 0} for r in rows]
+    return {"unidade":"distrito","cep_distrito":cep_distrito,"areas":[{"codigo":r["codigo"],"distrito":r["distrito"],
       "regiao":r["regiao"],"registros":r["registros"]} for r in rows]}
 
 @app.get("/api/map")

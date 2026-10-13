@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.resumo_distrito_diario (
 CREATE INDEX IF NOT EXISTS ix_resumo_distrito_periodo
  ON public.resumo_distrito_diario(data_ocorrencia,codigo_distrito)
  INCLUDE(categoria_dado,cep,registros);
+CREATE INDEX IF NOT EXISTS ix_resumo_distrito_cep ON public.resumo_distrito_diario(cep) INCLUDE(codigo_distrito,registros);
 CREATE OR REPLACE VIEW public.vw_resumo_mensal AS
  SELECT date_trunc('month',data_ocorrencia)::date AS mes,municipio,categoria_dado,count(*) AS registros,
  count(*) FILTER(WHERE cep IS NOT NULL) AS registros_com_cep,count(*) FILTER(WHERE localizacao IS NOT NULL) AS registros_com_coordenada
