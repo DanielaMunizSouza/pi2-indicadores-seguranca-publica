@@ -60,18 +60,17 @@ def area_geometry():
 
 @app.get("/api/summary")
 def summary(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31)),cep:str|None=None,category:str|None=None):
-    where,params=make_where(start,end,cep,category)
+    where,params=make_where(start,end,cep,category,include_city=False)
     try:
         with connect() as conn:
             rows=conn.execute(f"""SELECT GROUPING(categoria_dado) AS sem_categoria,
                 GROUPING(date_trunc('month',data_ocorrencia)) AS sem_mes,
                 categoria_dado,date_trunc('month',data_ocorrencia)::date AS mes,
-                count(*) AS total,
-                count(*) FILTER(WHERE cep IS NOT NULL) AS com_cep,
-                count(*) FILTER(WHERE localizacao IS NOT NULL) AS com_coordenada,
-                avg(latitude) FILTER(WHERE localizacao IS NOT NULL) AS latitude,
-                avg(longitude) FILTER(WHERE localizacao IS NOT NULL) AS longitude
-                FROM public.registro_ocorrencia WHERE {where}
+                sum(registros) AS total,sum(com_cep) AS com_cep,
+                sum(com_coordenada) AS com_coordenada,
+                sum(soma_latitude)/NULLIF(sum(coordenadas_centro),0) AS latitude,
+                sum(soma_longitude)/NULLIF(sum(coordenadas_centro),0) AS longitude
+                FROM public.resumo_ocorrencia_diario WHERE {where}
                 GROUP BY GROUPING SETS ((),(date_trunc('month',data_ocorrencia)),(categoria_dado))
                 ORDER BY sem_categoria DESC,sem_mes DESC,mes,categoria_dado""",params).fetchall()
             total=next(r for r in rows if r["sem_categoria"] and r["sem_mes"])

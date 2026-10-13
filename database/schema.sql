@@ -38,6 +38,21 @@ CREATE INDEX IF NOT EXISTS ix_resumo_distrito_periodo
  ON public.resumo_distrito_diario(data_ocorrencia,codigo_distrito)
  INCLUDE(categoria_dado,cep,registros);
 CREATE INDEX IF NOT EXISTS ix_resumo_distrito_cep ON public.resumo_distrito_diario(cep) INCLUDE(codigo_distrito,registros);
+CREATE TABLE IF NOT EXISTS public.resumo_ocorrencia_diario (
+ data_ocorrencia date NOT NULL,
+ categoria_dado text NOT NULL,
+ cep varchar(8) NOT NULL DEFAULT '',
+ registros bigint NOT NULL,
+ com_cep bigint NOT NULL,
+ com_coordenada bigint NOT NULL,
+ soma_latitude double precision NOT NULL DEFAULT 0,
+ soma_longitude double precision NOT NULL DEFAULT 0,
+ coordenadas_centro bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(data_ocorrencia,categoria_dado,cep)
+);
+CREATE INDEX IF NOT EXISTS ix_resumo_ocorrencia_periodo
+ ON public.resumo_ocorrencia_diario(data_ocorrencia)
+ INCLUDE(categoria_dado,cep,registros,com_cep,com_coordenada,soma_latitude,soma_longitude,coordenadas_centro);
 CREATE OR REPLACE VIEW public.vw_resumo_mensal AS
  SELECT date_trunc('month',data_ocorrencia)::date AS mes,municipio,categoria_dado,count(*) AS registros,
  count(*) FILTER(WHERE cep IS NOT NULL) AS registros_com_cep,count(*) FILTER(WHERE localizacao IS NOT NULL) AS registros_com_coordenada
