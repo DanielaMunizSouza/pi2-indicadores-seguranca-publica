@@ -238,3 +238,4 @@ data/tmp/
 
 # Arquivos temporários do Windows
 Thumbs.db
+data/processed/

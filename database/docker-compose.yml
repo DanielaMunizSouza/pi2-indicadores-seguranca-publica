@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pi2_seguranca_publica}
+      POSTGRES_USER: ${POSTGRES_USER:-pi2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD em .env}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pi2_postgis_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-pi2} -d ${POSTGRES_DB:-pi2_seguranca_publica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+volumes:
+  pi2_postgis_data:
