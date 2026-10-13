@@ -51,16 +51,22 @@ def summary(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31)),ce
     where,params=make_where(start,end,cep,category)
     try:
         with connect() as conn:
-            total=conn.execute(f"""SELECT count(*) AS total,count(*) FILTER(WHERE cep IS NOT NULL) AS com_cep,
-            count(*) FILTER(WHERE localizacao IS NOT NULL) AS com_coordenada,
-            avg(latitude) FILTER(WHERE localizacao IS NOT NULL) AS latitude,
-            avg(longitude) FILTER(WHERE localizacao IS NOT NULL) AS longitude
-            FROM public.registro_ocorrencia WHERE {where}""",params).fetchone()
-            monthly=conn.execute(f"""SELECT to_char(date_trunc('month',data_ocorrencia),'YYYY-MM') AS mes,count(*) AS registros
-            FROM public.registro_ocorrencia WHERE {where} GROUP BY 1 ORDER BY 1""",params).fetchall()
-            grouped=conn.execute(f"""SELECT categoria_dado,count(*) AS registros FROM public.registro_ocorrencia
-            WHERE {where} GROUP BY categoria_dado ORDER BY registros DESC""",params).fetchall()
-    except psycopg.Error as exc: raise HTTPException(503,"Falha ao consultar os dados. Confira se o esquema foi criado.") from exc
+            rows=conn.execute(f"""SELECT GROUPING(categoria_dado) AS sem_categoria,
+                GROUPING(date_trunc('month',data_ocorrencia)) AS sem_mes,
+                categoria_dado,date_trunc('month',data_ocorrencia)::date AS mes,
+                count(*) AS total,
+                count(*) FILTER(WHERE cep IS NOT NULL) AS com_cep,
+                count(*) FILTER(WHERE localizacao IS NOT NULL) AS com_coordenada,
+                avg(latitude) FILTER(WHERE localizacao IS NOT NULL) AS latitude,
+                avg(longitude) FILTER(WHERE localizacao IS NOT NULL) AS longitude
+                FROM public.registro_ocorrencia WHERE {where}
+                GROUP BY GROUPING SETS ((),(date_trunc('month',data_ocorrencia)),(categoria_dado))
+                ORDER BY sem_categoria DESC,sem_mes DESC,mes,categoria_dado""",params).fetchall()
+            total=next(r for r in rows if r["sem_categoria"] and r["sem_mes"])
+            monthly=[{"mes":r["mes"].strftime("%Y-%m"),"registros":r["total"]} for r in rows if r["sem_categoria"] and not r["sem_mes"]]
+            grouped=[r for r in rows if not r["sem_categoria"] and r["sem_mes"]]
+    except psycopg.Error as exc:
+        raise HTTPException(503,"Falha ao consultar os dados. Confira se o esquema foi criado.") from exc
     return {"total":total["total"],"com_cep":total["com_cep"],"com_coordenada":total["com_coordenada"],
       "centro":{"latitude":total["latitude"],"longitude":total["longitude"]},"mensal":monthly,
       "categorias":[{"value":r["categoria_dado"],"label":CATEGORIES.get(r["categoria_dado"],r["categoria_dado"]),"registros":r["registros"]} for r in grouped],
