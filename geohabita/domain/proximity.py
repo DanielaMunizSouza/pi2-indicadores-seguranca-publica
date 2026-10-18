@@ -20,12 +20,18 @@ def proximity_note(distance_m: float | None, ideal_m: float, max_m: float) -> fl
     0 quando ``distance_m >= max_m`` e interpolação linear no intervalo.
     Uma distância ausente (nenhum equipamento do tipo) resulta em 0 (RN15).
     """
-    raise NotImplementedError
+    if distance_m is None or distance_m >= max_m:
+        return 0.0
+    if distance_m <= ideal_m:
+        return 100.0
+    return 100 * (max_m - distance_m) / (max_m - ideal_m)
 
 
 def category_note(notes: Sequence[float]) -> float:
     """Nota da categoria: média aritmética das notas dos seus tipos."""
-    raise NotImplementedError
+    if not notes:
+        raise ValueError("A categoria precisa de ao menos uma nota de tipo.")
+    return sum(notes) / len(notes)
 
 
 def walking_time_minutes(distance_m: float) -> int:
