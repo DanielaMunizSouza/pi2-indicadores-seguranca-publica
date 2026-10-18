@@ -8,6 +8,7 @@ geodésica em linha reta (RN12).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 WALK_SPEED_M_PER_MINUTE = 80
@@ -36,7 +37,7 @@ def category_note(notes: Sequence[float]) -> float:
 
 def walking_time_minutes(distance_m: float) -> int:
     """Tempo estimado de caminhada a 80 m/min, arredondado para cima (RN14)."""
-    raise NotImplementedError
+    return math.ceil(distance_m / WALK_SPEED_M_PER_MINUTE)
 
 
 def weighted_index(scores: Sequence[float], weights: Sequence[float]) -> float:
