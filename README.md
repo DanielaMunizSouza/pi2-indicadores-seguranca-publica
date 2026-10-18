@@ -28,6 +28,35 @@ docker compose --env-file .env -f database/docker-compose.yml up -d
 
 Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `py scripts/importar_distritos_sp.py` e `py scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
 
+## Testes
+
+A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o comportamento esperado pela especificação de requisitos (`relatorio_parcial/requisitos_geohabita.tex`) antes da implementação.
+
+Instale as dependências de desenvolvimento:
+
+```powershell
+py -m pip install -r requirements-dev.txt
+```
+
+Execute os testes na raiz do projeto:
+
+```powershell
+py -m pytest
+```
+
+Para medir a cobertura das regras de negócio (meta de 70% do RNF11):
+
+```powershell
+py -m pytest --cov=geohabita
+```
+
+A especificação, os testes e o código são organizados por regra:
+
+- `geohabita/domain/` reúne as regras de negócio puras, sem acesso a banco de dados, rede ou interface.
+- `tests/domain/` reúne os testes unitários correspondentes, com referência à regra (RN), ao requisito (RF/RNF) ou ao caso de teste (CT) da especificação.
+
+Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (validação e normalização de CEP), `thresholds.py` (limiares de distância por tipo de equipamento), `proximity.py` (nota por tipo, tempo de caminhada e IPL), `vitality.py` (IVEP) e `rates.py` (taxas oficiais de ocorrências). No momento, as funções de cálculo ainda são contratos que levantam `NotImplementedError`, de modo que a suíte permanece em estado vermelho até a implementação. O alvo de cobertura de 70% das regras de negócio vem do RNF11.
+
 ## Dados
 
 Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB por arquivo do GitHub. O banco local ocupa vários GB. Por isso, os arquivos e dumps não são versionados: o repositório inclui rotinas reproduzíveis para criação, importação e padronização. Execute `database/schema.sql` uma vez no banco vazio, configure DATABASE_URL e use:
