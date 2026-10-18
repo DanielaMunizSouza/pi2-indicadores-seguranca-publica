@@ -46,11 +46,16 @@ def weighted_index(scores: Sequence[float], weights: Sequence[float]) -> float:
     Levanta ``ValueError`` quando as listas têm tamanhos diferentes ou quando
     a soma dos pesos é zero, casos em que o índice não está definido.
     """
-    raise NotImplementedError
+    if len(scores) != len(weights):
+        raise ValueError("Cada nota precisa de exatamente um peso.")
+    total_weight = sum(weights)
+    if total_weight == 0:
+        raise ValueError("A soma dos pesos deve ser maior que zero.")
+    return sum(s * w for s, w in zip(scores, weights)) / total_weight
 
 
 def local_proximity_index(
     category_notes: Sequence[float], weights: Sequence[float]
 ) -> float:
     """Índice de Proximidade Local do endereço consultado (RF24)."""
-    raise NotImplementedError
+    return weighted_index(category_notes, weights)
