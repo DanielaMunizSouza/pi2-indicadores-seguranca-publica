@@ -1,0 +1,26 @@
+@startsalt wireframe_inicial
+' Wireframe de baixa fidelidade — tela inicial de consulta
+' Renderizar: java -jar plantuml.jar -tsvg wireframe_inicial.puml
+{+
+  {* Início | Como calculamos | Fontes dos dados | Acessibilidade }
+  ==
+  <b>GeoHabita — Diagnóstico socioespacial do seu futuro endereço
+  .
+  Conheça a infraestrutura pública, a vida nas ruas e os dados oficiais
+  de ocorrências de qualquer endereço da cidade de São Paulo.
+  .
+  {
+    CEP:      | "01310-100    " | [Consultar]
+    .         | ou              | .
+    Endereço: | "Rua, número    " | [Consultar]
+  }
+  .
+  {+
+    <i>Resultado anunciado ao leitor de tela ao fim da consulta
+  }
+  .
+  { [A+] | [A-] | [Alto contraste] | [Pular para o conteúdo] }
+  ==
+  Dados: GeoSampa, SSP-SP, IBGE, OpenStreetMap | Código aberto (GNU AGPL v3)
+}
+@endsalt

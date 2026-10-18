@@ -1,0 +1,14 @@
+%% Fluxo da rotina de carga (ETL) das bases abertas
+%% Renderizar: mmdc -i fluxo_etl.mmd -o fluxo_etl.pdf --pdfFit
+%%{init: {'theme':'neutral', 'themeVariables': {'fontFamily':'Arial'}}}%%
+flowchart TB
+    A([Administrador inicia a carga]) --> B[Baixa arquivos ou<br/>consulta WFS da fonte]
+    B --> C[Padroniza colunas<br/>e tipos por ano]
+    C --> D[Reprojeta coordenadas<br/>SIRGAS 2000 / UTM 23S → WGS84]
+    D --> E{Coordenada válida<br/>e dentro do município?}
+    E -- "Não" --> F[Descarta e contabiliza<br/>RN10]
+    E -- "Sim" --> G[Associa ao distrito<br/>ponto-em-polígono]
+    F --> H
+    G --> H[Recalcula IVEP e taxas<br/>dos 96 distritos]
+    H --> I[Grava nova versão com<br/>data de referência]
+    I --> J([Registra relatório<br/>da carga])

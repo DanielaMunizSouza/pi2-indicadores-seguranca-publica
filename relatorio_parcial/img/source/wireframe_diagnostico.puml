@@ -1,0 +1,49 @@
+@startsalt wireframe_diagnostico
+' Wireframe de baixa fidelidade — tela de diagnóstico do endereço
+' Renderizar: java -jar plantuml.jar -tsvg wireframe_diagnostico.puml
+{+
+  {* Início | Como calculamos | Fontes dos dados | Acessibilidade }
+  ==
+  <b>Endereço consultado: Rua Exemplo, 100 — Distrito: Distrito X | [Nova consulta] | [Comparar]
+  ==
+  {/ <b>Proximidade | Vitalidade do distrito | Ocorrências oficiais | Ver como tabela }
+  {
+    {+
+      <b>Mapa do entorno
+      .
+      .       [Mapa: ponto consultado,
+      .        limite do distrito e
+      .        equipamentos por categoria]
+      .
+      .
+      {
+        [X] Lazer   | [X] Mobilidade | [X] Serviços
+        [X] Cultura | [X] Feiras     | [X] Wi-Fi
+      }
+    } | {+
+      <b>Índice de Proximidade Local: 78 / 100
+      .
+      {#
+        <b>Tipo | <b>Mais próximo | <b>Distância | <b>A pé
+        Ponto de ônibus | Ponto A | 120 m | 2 min
+        Estação de metrô | Estação B | 350 m | 5 min
+        Praça | Praça C | 600 m | 8 min
+        Escola pública | Escola D | 700 m | 9 min
+        UBS | UBS E | 900 m | 12 min
+        Feira livre | Feira F | 1,1 km | 14 min
+      }
+      <i>Dados ilustrativos. Distâncias em linha reta a partir do CEP.
+      .
+      <b>Minhas prioridades
+      {
+        Mobilidade | (X) 5 | () 3 | () 1 | () 0
+        Lazer      | () 5 | (X) 3 | () 1 | () 0
+        Serviços   | () 5 | (X) 3 | () 1 | () 0
+      }
+      [Recalcular]
+    }
+  }
+  ==
+  <i>Fontes: GeoSampa, SSP-SP, IBGE (Censo 2022) — com data de referência de cada dado. | [Como calculamos?]
+}
+@endsalt

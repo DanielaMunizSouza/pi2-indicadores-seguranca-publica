@@ -1,0 +1,475 @@
+% =====================================================================
+% GeoHabita --- Especificação de Requisitos de Software
+% Trecho para inclusão no relatório (abnTeX2). Sugestão de uso:
+%   \input{requisitos_geohabita}
+% posicionado após a subseção "Metodologia" (ou dentro de
+% "Resultados preliminares: solução inicial").
+%
+% Pacotes necessários no preâmbulo do relatório:
+%   \usepackage{longtable}
+%   \usepackage{tabularx}
+%   \usepackage{booktabs}
+%   \usepackage{array}
+%   \usepackage{amsmath}
+% Referências novas: ver requisitos_geohabita.bib
+% =====================================================================
+
+\counterwithin{section}{chapter}
+\renewcommand{\thesection}{\thechapter.\arabic{section}}
+\counterwithin{table}{chapter}
+\renewcommand{\thetable}{\thechapter.\arabic{table}}
+\counterwithin{equation}{chapter}
+\renewcommand{\theequation}{\thechapter.\arabic{equation}}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+
+\section{Especificação de requisitos}
+
+A especificação de requisitos do GeoHabita consolida, em termos verificáveis, aquilo que a plataforma deve oferecer ao cidadão e as condições de qualidade sob as quais deve operar. Em relação à concepção inicial, o escopo foi reorientado: a segurança deixa de ser tratada prioritariamente a partir da estatística criminal e passa a ser lida também pela infraestrutura pública de uso do espaço, isto é, pelos equipamentos e lugares que atraem pessoas às ruas em horários variados e sustentam o que \citeonline[cap.~1]{jacobs2011} denomina vigilância natural dos ``olhos na rua''. Praças, parques, equipamentos culturais e esportivos, feiras livres, pontos de transporte coletivo, unidades de saúde e escolas passam a compor um indicador próprio de vitalidade do espaço público, apresentado lado a lado com os registros oficiais da SSP-SP \cite{ssp2024,geosampa2024}.
+
+A estrutura adotada segue a norma ISO/IEC/IEEE 29148 \cite{iso29148} e a classificação proposta por \citeonline{sommerville2018}, que distingue requisitos funcionais, requisitos não funcionais (de produto, organizacionais e externos) e requisitos de domínio. Os atributos de qualidade são organizados segundo o modelo da ISO/IEC 25010 \cite{iso25010}, e o desdobramento em histórias de usuário e critérios de aceitação acompanha as práticas ágeis descritas por \citeonline{cohn2004} e \citeonline{pressman2021}. Cada requisito recebe identificador único, prioridade segundo a técnica MoSCoW (\emph{Must}, \emph{Should}, \emph{Could}, \emph{Won't}) e rastreabilidade até os casos de teste que o verificam.
+
+\subsection{Escopo do produto e atores}
+
+O Produto Mínimo Viável (MVP) delimita-se ao município de São Paulo e aos seus 96 distritos administrativos, unidade territorial escolhida por dispor de polígonos oficiais no GeoSampa e de população recenseada pelo IBGE, o que permite o cálculo de taxas comparáveis entre regiões. A consulta parte de um CEP ou de um endereço informado pelo usuário, que é convertido em coordenadas geográficas e associado ao distrito correspondente. A partir desse ponto, o sistema produz um diagnóstico socioespacial composto por três blocos: a proximidade do endereço consultado aos equipamentos públicos de uso do espaço, medida pela distância até o equipamento mais próximo de cada tipo; o indicador de vitalidade do espaço público do distrito; e os indicadores oficiais de ocorrências criminais, sempre contextualizados.
+
+Permanecem fora do escopo do MVP a intermediação ou divulgação de anúncios imobiliários, a coleta colaborativa de relatos de crimes, a predição de ocorrências por modelos de aprendizado de máquina, a extração automatizada não estruturada de páginas (\emph{web scraping}) e aplicativos nativos para dispositivos móveis. A exclusão dos relatos colaborativos decorre, em particular, do risco de reforço de estigmas territoriais e de reidentificação de vítimas já discutido na fundamentação teórica.
+
+Identificam-se três atores principais, descritos no Quadro~\ref{qua:atores}.
+
+\begin{table}[htb]
+	\caption{Atores do sistema}
+	\label{qua:atores}
+	\centering
+	\small
+	\begin{tabularx}{\textwidth}{L{3.6cm}X}
+		\toprule
+		\textbf{Ator}                   & \textbf{Descrição e interesse}                                                                                                                                                            \\
+		\midrule
+		Munícipe consulente             & Pessoa ou família em transição habitacional, ou morador interessado em conhecer o próprio território. Consulta endereços, compara regiões e não precisa de cadastro para o uso essencial. \\
+		Usuário de tecnologia assistiva & Munícipe que acessa a plataforma por leitor de tela, navegação exclusiva por teclado ou ampliação. Exige equivalência textual integral para mapas e atualizações dinâmicas.               \\
+		Administrador de dados          & Integrante da equipe responsável por executar as rotinas de carga (ETL), validar as bases importadas e publicar novas versões dos indicadores.                                            \\
+		Sistemas externos               & Serviços de CEP e geocodificação, servidores WFS do GeoSampa, portais de dados abertos da SSP-SP e do IBGE. Impõem limites de uso, licenças e obrigações de atribuição.                   \\
+		\bottomrule
+	\end{tabularx}
+	\fonte{Elaborado pelo autor (2026).}
+\end{table}
+
+\subsection{Modelo de indicadores}
+
+A plataforma calcula três indicadores em duas escalas espaciais. Na escala do endereço, o Índice de Proximidade Local mede a distância do ponto consultado aos equipamentos públicos mais próximos. Na escala do distrito, o Índice de Vitalidade do Espaço Público mede a oferta de infraestrutura da região, e os indicadores oficiais de ocorrências descrevem os registros criminais. Por decisão de projeto, os indicadores de infraestrutura e os de ocorrências são exibidos de forma paralela e nunca fundidos em uma nota única de ``segurança'' ou ``periculosidade''. Essa separação atende à crítica de \citeonline{caldeira2000} à ``fala do crime'' e evita que a ferramenta reproduza os mapas de perigo que alimentam a segregação.
+
+Os três indicadores compartilham a mesma classificação de equipamentos, agrupados em seis categorias: (i) lazer e convivência (praças, parques e áreas verdes); (ii) cultura e esporte (bibliotecas, centros culturais, CEUs, clubes-escola e equipamentos esportivos); (iii) mobilidade (pontos e terminais de ônibus, estações de metrô e trem, ciclovias); (iv) comércio de rua de uso público (feiras livres e mercados municipais); (v) serviços essenciais (unidades de saúde e escolas públicas); e (vi) conectividade e permanência (pontos de Wi-Fi público e, quando disponível, iluminação pública). Cada categoria reúne um ou mais tipos de equipamento, como unidade básica de saúde, escola pública, praça, parque, ponto de ônibus ou estação de metrô e trem.
+
+O \textbf{Índice de Proximidade Local} (IPL) é o indicador específico do endereço consultado. Para cada tipo de equipamento $j$, o sistema calcula a distância $d_j$, em metros, entre o ponto obtido pelo CEP e o equipamento mais próximo daquele tipo, por meio de busca de vizinho mais próximo no banco geoespacial (operador de distância indexado do PostGIS sobre o tipo \emph{geography}). A distância é convertida em uma nota de 0 a 100 por uma função linear decrescente, definida por dois limiares próprios de cada tipo: a distância ideal $a_j$, até a qual a nota é máxima, e a distância máxima $b_j$, a partir da qual a nota é nula (Equação~\ref{eq:nota}):
+
+\begin{equation}
+	\label{eq:nota}
+	s_j =
+	\begin{cases}
+		100,                                    & \text{se } d_j \leq a_j    \\[4pt]
+		100 \cdot \dfrac{b_j - d_j}{b_j - a_j}, & \text{se } a_j < d_j < b_j \\[8pt]
+		0,                                      & \text{se } d_j \geq b_j
+	\end{cases}
+\end{equation}
+
+A nota da categoria $k$, $S_k$, é a média das notas dos tipos que a compõem, e o IPL do endereço $c$ é a média ponderada das categorias, com os mesmos pesos $w_k$ ajustáveis pelo usuário (Equação~\ref{eq:ipl}):
+
+\begin{equation}
+	\label{eq:ipl}
+	\text{IPL}_c = \frac{\sum_{k=1}^{6} w_k \, S_k}{\sum_{k=1}^{6} w_k}
+\end{equation}
+
+Os limiares iniciais, apresentados no Quadro~\ref{qua:limiares}, tomam como referência a distância de 400 metros, percorrida em cerca de cinco minutos de caminhada, e são tratados como parâmetros de configuração, a serem revistos com base nos testes com os moradores. Além da nota, o sistema informa para cada tipo a distância em linha reta, o tempo estimado de caminhada e a quantidade de equipamentos a até 500 metros e a até 1 quilômetro.
+
+\begin{table}[htb]
+	\caption{Limiares iniciais de distância por tipo de equipamento}
+	\label{qua:limiares}
+	\centering
+	\small
+	\begin{tabularx}{\textwidth}{L{3.6cm}XC{2.2cm}C{2.2cm}}
+		\toprule
+		\textbf{Categoria}  & \textbf{Tipos de equipamento}                               & \textbf{Ideal $a_j$ (m)} & \textbf{Máxima $b_j$ (m)} \\
+		\midrule
+		Lazer e convivência & Praça; parque ou área verde                                 & 400                      & 1\,200                    \\
+		Cultura e esporte   & Biblioteca ou centro cultural; CEU ou equipamento esportivo & 800                      & 2\,000                    \\
+		Mobilidade          & Ponto de ônibus                                             & 300                      & 800                       \\
+		Mobilidade          & Estação de metrô ou trem; ciclovia                          & 800                      & 2\,000                    \\
+		Comércio de rua     & Feira livre ou mercado municipal                            & 800                      & 1\,500                    \\
+		Serviços essenciais & Unidade básica de saúde; escola pública                     & 800                      & 2\,000                    \\
+		Conectividade       & Ponto de Wi-Fi público                                      & 400                      & 1\,200                    \\
+		\bottomrule
+	\end{tabularx}
+	\fonte{Elaborado pelo autor (2026).}
+\end{table}
+
+O \textbf{Índice de Vitalidade do Espaço Público} (IVEP) complementa o IPL na escala do distrito, indicando se a região como um todo oferece infraestrutura que atrai uso cotidiano do espaço. Para cada categoria $k$ e distrito $d$, calcula-se a densidade de equipamentos por quilômetro quadrado e por dez mil habitantes, convertida em posição percentil entre os 96 distritos ($P_{k,d}$, de 0 a 100). O índice é a média ponderada dos percentis, conforme a Equação~\ref{eq:ivep}:
+
+\begin{equation}
+	\label{eq:ivep}
+	\text{IVEP}_d = \frac{\sum_{k=1}^{6} w_k \, P_{k,d}}{\sum_{k=1}^{6} w_k}
+\end{equation}
+
+\noindent em que $w_k$ é o peso da categoria $k$, igual a 1 por padrão e ajustável pelo usuário entre 0 e 5, de modo que cada pessoa possa refletir suas prioridades de rotina.
+
+O terceiro indicador compõe os \textbf{indicadores oficiais de ocorrências}, estimados com base nos microdados georreferenciados provenientes de boletins de ocorrência divulgados pela SSP-SP \cite{ssp2025}, correlacionados aos distritos mediante operação espacial do tipo ponto-em-polígono. Em conformidade com as orientações do manual de interpretação elaborado pela própria secretaria \cite{ssp2005}, que ressalta a subnotificação e advertência quanto a comparações entre unidades de dimensões distintas, os valores são expressos como taxa anualizada por cem mil habitantes, discriminados por natureza da ocorrência (roubo, furto, roubo de celular, roubo de veículo e crimes contra a vida), calculados em janela móvel trienal, conforme a Equação~\ref{eq:taxa}:
+
+\begin{equation}
+\label{eq:taxa}
+T_{n,d} = \frac{O_{n,d}}{\text{Pop}_d \times a} \times 100\,000
+\end{equation}
+
+\noindent em que $O_{n,d}$ denota o quantitativo de ocorrências da natureza $n$ localizadas no distrito $d$ ao longo do período considerado, $\text{Pop}_d$ representa a população do distrito conforme dados do Censo Demográfico 2022 \cite{ibge2022} e $a$ corresponde ao número de anos abrangidos pela janela. Cada taxa é disponibilizada acompanhada da média municipal, da tendência observada no período e de notificação permanente sobre a questão da subnotificação.
+
+\subsection{Fontes de dados e integrações}
+
+O GeoHabita consome exclusivamente fontes abertas ou gratuitas, organizadas em dois fluxos. As consultas de endereço ocorrem em tempo real e passam por camada de cache; as bases estatísticas e cartográficas são importadas por rotinas periódicas de extração, transformação e carga (ETL) e versionadas com data de referência. O Quadro~\ref{qua:fontes} sintetiza as integrações previstas.
+
+\begin{longtable}{L{3.1cm}L{4.3cm}L{2.3cm}L{4.4cm}}
+	\caption{Fontes de dados e integrações}
+	\label{qua:fontes}                                                                                                                                                                                                                                \\
+	\toprule
+	\textbf{Fonte}                        & \textbf{Uso no sistema}                                                                              & \textbf{Acesso}                    & \textbf{Restrições}                                           \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{Fonte}                        & \textbf{Uso no sistema}                                                                              & \textbf{Acesso}                    & \textbf{Restrições}                                           \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	ViaCEP                                & Validação do CEP e obtenção de logradouro, bairro e código IBGE                                      & API REST, tempo real               & Não retorna coordenadas; bloqueio em uso massivo              \\
+	BrasilAPI (CEP v2) e AwesomeAPI       & Contingência do ViaCEP e obtenção de latitude e longitude                                            & API REST, tempo real               & Coordenadas aproximadas e eventualmente ausentes              \\
+	Nominatim (OpenStreetMap)             & Geocodificação de endereço completo quando o CEP não traz coordenadas                                & API REST, tempo real               & Até 1 requisição por segundo; cache e atribuição obrigatórios \\
+	GeoSampa                              & Polígonos dos 96 distritos e camadas de equipamentos públicos, áreas verdes, transporte e mobilidade & WFS, carga periódica               & Sistema de referência SIRGAS 2000/UTM 23S; exige reprojeção   \\
+	Portal de dados abertos da Prefeitura & Feiras livres, pontos de Wi-Fi público e demais cadastros municipais complementares                  & Arquivos CSV/JSON, carga periódica & Coordenadas a validar; atualização irregular                  \\
+	SSP-SP                                & Microdados de boletins de ocorrência com coordenadas                                                 & Planilhas anuais, carga periódica  & Colunas variam entre anos; coordenadas nulas; subnotificação  \\
+	IBGE (Censo 2022)                     & População por distrito para cálculo de taxas e densidades                                            & Arquivos e API, carga periódica    & Atualização decenal                                           \\
+	OpenStreetMap e Leaflet               & Base cartográfica do mapa interativo                                                                 & Biblioteca JavaScript              & Atribuição obrigatória (licença ODbL)                         \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+\subsection{Requisitos funcionais}
+
+Os requisitos funcionais descrevem os comportamentos observáveis do sistema \cite{sommerville2018}. Foram identificados 25 requisitos, agrupados em cinco módulos, dos quais 14 são classificados como essenciais (\emph{Must}) e compõem o MVP (Quadro~\ref{qua:rf}).
+
+\begin{longtable}{C{1.2cm}L{9.2cm}C{1.5cm}C{2.2cm}}
+	\caption{Requisitos funcionais}
+	\label{qua:rf}                                                                                                                                                                                                                                \\
+	\toprule
+	\textbf{ID} & \textbf{Descrição}                                                                                                                                                                          & \textbf{Prior.} & \textbf{Módulo} \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{ID} & \textbf{Descrição}                                                                                                                                                                          & \textbf{Prior.} & \textbf{Módulo} \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	RF01        & O sistema deve permitir a consulta por CEP, validando o formato de oito dígitos antes de qualquer chamada externa.                                                                          & Must            & Consulta        \\
+	RF02        & O sistema deve preencher automaticamente logradouro, bairro e município a partir do CEP informado.                                                                                          & Must            & Consulta        \\
+	RF03        & O sistema deve permitir a consulta por endereço textual quando o usuário não souber o CEP.                                                                                                  & Should          & Consulta        \\
+	RF04        & O sistema deve converter o endereço em coordenadas geográficas, utilizando serviço de contingência em caso de falha do serviço principal.                                                   & Must            & Consulta        \\
+	RF05        & O sistema deve identificar o distrito administrativo correspondente às coordenadas por operação de ponto-em-polígono.                                                                       & Must            & Consulta        \\
+	RF06        & O sistema deve informar ao usuário quando o endereço estiver fora do município de São Paulo.                                                                                                & Must            & Consulta        \\
+	RF07        & O sistema deve listar os equipamentos públicos de uso do espaço em raio de 500 metros e de 1 quilômetro do ponto consultado, agrupados pelas seis categorias do IVEP, com nome e distância. & Must            & Diagnóstico     \\
+	RF23        & O sistema deve calcular, para o endereço consultado, a distância em linha reta até o equipamento mais próximo de cada tipo, com o tempo estimado de caminhada.                              & Must            & Diagnóstico     \\
+	RF24        & O sistema deve calcular e exibir o Índice de Proximidade Local do endereço e a nota de cada categoria, destacando os tipos de equipamento ausentes no raio máximo.                          & Must            & Diagnóstico     \\
+	RF25        & O sistema deve calcular a distância e o tempo pela rede de calçadas e vias até o equipamento mais próximo de cada tipo, quando o usuário solicitar.                                         & Could           & Diagnóstico     \\
+	RF08        & O sistema deve exibir o IVEP do distrito, o percentil de cada categoria e a comparação com a mediana do município.                                                                          & Must            & Diagnóstico     \\
+	RF09        & O sistema deve permitir que o usuário ajuste os pesos das categorias do IPL e do IVEP e recalcule os índices sem recarregar a página.                                                       & Should          & Diagnóstico     \\
+	RF10        & O sistema deve exibir as taxas de ocorrências por cem mil habitantes do distrito, por natureza, com média municipal e tendência dos últimos três anos.                                      & Must            & Diagnóstico     \\
+	RF11        & O sistema deve apresentar, junto às taxas criminais, nota explicativa sobre subnotificação e sobre a metodologia de cálculo.                                                                & Must            & Diagnóstico     \\
+	RF12        & O sistema deve exibir a fonte e a data de referência de cada indicador apresentado.                                                                                                         & Must            & Diagnóstico     \\
+	RF13        & O sistema deve exibir mapa interativo com o ponto consultado, o limite do distrito e os equipamentos do entorno, filtráveis por categoria.                                                  & Must            & Visualização    \\
+	RF14        & O sistema deve oferecer, para todo conteúdo cartográfico, tabela textual equivalente navegável por teclado e leitor de tela.                                                                & Must            & Visualização    \\
+	RF15        & O sistema deve anunciar por região viva (\emph{live region}) WAI-ARIA a conclusão de cada consulta assíncrona e eventuais erros.                                                            & Should          & Visualização    \\
+	RF16        & O sistema deve permitir a comparação lado a lado de até três endereços ou distritos.                                                                                                        & Should          & Comparação      \\
+	RF17        & O sistema deve permitir compartilhar um diagnóstico por link, sem armazenar dados pessoais do consulente.                                                                                   & Could           & Comparação      \\
+	RF18        & O sistema deve permitir exportar o diagnóstico em formato PDF acessível ou CSV.                                                                                                             & Could           & Comparação      \\
+	RF19        & O sistema deve permitir ao administrador executar as rotinas de carga das bases externas e registrar o resultado de cada execução.                                                          & Should          & Administração   \\
+	RF20        & O sistema deve validar as bases importadas, descartando registros sem coordenadas ou fora dos limites do município e reportando a quantidade descartada.                                    & Should          & Administração   \\
+	RF21        & O sistema deve manter o histórico de versões dos indicadores com data de referência de cada carga.                                                                                          & Could           & Administração   \\
+	RF22        & O sistema deve disponibilizar uma API pública de leitura dos indicadores agregados por distrito, documentada em OpenAPI.                                                                    & Could           & Administração   \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+\subsection{Requisitos não funcionais}
+
+Os requisitos não funcionais estabelecem restrições sobre os serviços oferecidos e sobre o processo de desenvolvimento \cite{sommerville2018}. Para garantir sua verificabilidade, cada requisito de produto está associado a uma métrica objetiva, conforme recomendam \citeonline{pressman2021}. Os requisitos de produto estão classificados segundo as características de qualidade da ISO/IEC 25010 (Quadro~\ref{qua:rnf}).
+
+\begin{longtable}{C{1.3cm}L{2.6cm}L{6.1cm}L{4.1cm}}
+	\caption{Requisitos não funcionais de produto}
+	\label{qua:rnf}                                                                                                                                                                                                                                                                                                                                             \\
+	\toprule
+	\textbf{ID} & \textbf{Característica}              & \textbf{Requisito}                                                                                                                                                                                    & \textbf{Métrica de verificação}                                                                \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{ID} & \textbf{Característica}              & \textbf{Requisito}                                                                                                                                                                                    & \textbf{Métrica de verificação}                                                                \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	RNF01       & Eficiência de desempenho             & O diagnóstico de um CEP já armazenado em cache deve ser exibido em até 2 segundos.                                                                                                                    & Percentil 95 $\leq$ 2 s com 30 usuários simultâneos                                            \\
+	RNF02       & Eficiência de desempenho             & O diagnóstico de um CEP inédito deve ser exibido em até 6 segundos.                                                                                                                                   & Percentil 95 $\leq$ 6 s em teste de carga                                                      \\
+	RNF03       & Usabilidade (acessibilidade)         & A interface deve atender às diretrizes WCAG 2.1 no nível AA e empregar marcações WAI-ARIA em todos os componentes dinâmicos.                                                                          & Zero erros críticos em Lighthouse e axe; contraste $\geq$ 4,5:1                                \\
+	RNF04       & Usabilidade (operabilidade)          & Todas as funções devem ser operáveis exclusivamente por teclado, com foco visível e ordem lógica.                                                                                                     & Roteiro de teste manual com NVDA e Orca                                                        \\
+	RNF05       & Usabilidade (inteligibilidade)       & Os textos explicativos devem usar linguagem simples, sem jargão técnico ou geográfico sem explicação.                                                                                                 & Avaliação em teste com usuários; SUS $\geq$ 70                                                 \\
+	RNF06       & Confiabilidade (tolerância a falhas) & A falha de uma fonte externa não deve impedir a exibição dos demais blocos do diagnóstico.                                                                                                            & Teste com serviço externo simulado fora do ar                                                  \\
+	RNF07       & Confiabilidade (disponibilidade)     & A aplicação deve manter disponibilidade mensal mínima de 98\%.                                                                                                                                        & Monitoramento externo de disponibilidade                                                       \\
+	RNF08       & Segurança                            & Todo o tráfego deve ocorrer por HTTPS, e as rotas públicas devem limitar-se a 60 requisições por minuto por endereço IP.                                                                              & Teste automatizado; resposta HTTP 429 acima do limite                                          \\
+	RNF09       & Segurança                            & A aplicação não deve apresentar vulnerabilidades de alta severidade do OWASP Top 10.                                                                                                                  & Varredura com OWASP ZAP e auditoria de dependências                                            \\
+	RNF10       & Manutenibilidade                     & O código deve adotar arquitetura em camadas (apresentação, aplicação, domínio e infraestrutura), com adaptadores isolando cada serviço externo.                                                       & Revisão em \emph{pull request}; ausência de chamadas externas fora da camada de infraestrutura \\
+	RNF11       & Manutenibilidade (testabilidade)     & As regras de negócio devem ter cobertura mínima de 70\% por testes unitários.                                                                                                                         & Relatório de cobertura na integração contínua                                                  \\
+	RNF12       & Compatibilidade e portabilidade      & A interface deve funcionar nas duas versões mais recentes dos navegadores Chrome, Firefox, Edge e Safari, em telas a partir de 360 pixels de largura, e a aplicação deve ser empacotada em contêiner. & Roteiro multiplataforma; implantação em nuvem com um único comando                             \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+Os requisitos organizacionais e externos, que não se referem diretamente ao comportamento do produto, estão reunidos no Quadro~\ref{qua:rnf-org}.
+
+\begin{table}[htb]
+	\caption{Requisitos não funcionais organizacionais e externos}
+	\label{qua:rnf-org}
+	\centering
+	\small
+	\begin{tabularx}{\textwidth}{C{1.3cm}C{2.4cm}X}
+		\toprule
+		\textbf{ID} & \textbf{Tipo}      & \textbf{Requisito}                                                                                                                                                                                                         \\
+		\midrule
+		RNF13       & Organizacional     & O desenvolvimento deve seguir práticas do Scrum, com \emph{sprints} de duas semanas, controle de versão em Git e integração contínua executando os testes a cada envio ao repositório.                                     \\
+		RNF14       & Organizacional     & A pilha tecnológica deve compreender Python com micro-framework web no serviço de retaguarda, JavaScript no cliente, PostgreSQL com extensão PostGIS na persistência e hospedagem em provedor de nuvem com plano gratuito. \\
+		RNF15       & Externo (legal)    & O tratamento de dados deve observar a Lei Geral de Proteção de Dados \cite{lgpd2018}: a consulta não exige cadastro e nenhum CEP consultado é associado a pessoa identificável.                                            \\
+		RNF16       & Externo (legal)    & A plataforma deve atender ao art. 63 da Lei Brasileira de Inclusão \cite{lbi2015}, que torna obrigatória a acessibilidade em sítios da internet.                                                                           \\
+		RNF17       & Externo (licenças) & Todas as fontes devem ser atribuídas conforme suas licenças, e o código deve ser distribuído sob a GNU AGPL v3 \cite{agplv3}.                                                                                              \\
+		RNF18       & Externo (ético)    & Os indicadores não devem empregar rótulos estigmatizantes, rankings de ``bairros perigosos'' nem escalas cromáticas de alarme para dados criminais.                                                                        \\
+		\bottomrule
+	\end{tabularx}
+	\fonte{Elaborado pelo autor (2026).}
+\end{table}
+
+\subsection{Regras de negócio e requisitos de domínio}
+
+As regras de negócio condensam o conhecimento do domínio urbano e estatístico que o sistema deve respeitar independentemente da interface. Elas são implementadas na camada de domínio e testadas de forma isolada (Quadro~\ref{qua:rn}).
+
+\begin{longtable}{C{1.2cm}L{10.6cm}L{2.6cm}}
+	\caption{Regras de negócio}
+	\label{qua:rn}                                                                                                                                                                                                                                                                                               \\
+	\toprule
+	\textbf{ID} & \textbf{Regra}                                                                                                                                                                                                                                                        & \textbf{Relacionada a} \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{ID} & \textbf{Regra}                                                                                                                                                                                                                                                        & \textbf{Relacionada a} \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	RN01        & Um CEP válido possui exatamente oito dígitos numéricos; hífens, pontos e espaços são removidos antes da validação.                                                                                                                                                    & RF01                   \\
+	RN02        & Um CEP inexistente gera a mensagem ``CEP não encontrado'' e libera a consulta por endereço textual.                                                                                                                                                                   & RF02, RF03             \\
+	RN03        & O serviço de contingência é acionado quando o serviço principal retorna erro ou excede 3 segundos de resposta.                                                                                                                                                        & RF04, RNF06            \\
+	RN04        & Resultados de CEP e geocodificação permanecem em cache por 30 dias; indicadores agregados, até a próxima carga.                                                                                                                                                       & RF04, RNF01            \\
+	RN05        & A coordenada obtida pelo CEP é tratada como aproximada; a interface informa que ela identifica o distrito, mas não a posição exata do imóvel.                                                                                                                         & RF05, RF07             \\
+	RN06        & O IVEP é calculado por percentis entre os 96 distritos e varia de 0 a 100; os pesos padrão são iguais a 1 e aceitam valores inteiros de 0 a 5.                                                                                                                        & RF08, RF09             \\
+	RN07        & Os indicadores de vitalidade e os indicadores de ocorrências nunca são combinados em uma pontuação única.                                                                                                                                                             & RF08, RF10, RNF18      \\
+	RN08        & As taxas de ocorrências usam janela de três anos completos e são expressas por cem mil habitantes; o ano corrente incompleto não entra no cálculo.                                                                                                                    & RF10                   \\
+	RN09        & Naturezas com menos de 30 ocorrências no distrito durante a janela são exibidas como ``número insuficiente para comparação'', sem taxa nem tendência.                                                                                                                 & RF10, RF11             \\
+	RN10        & Registros da SSP-SP com coordenadas nulas, iguais a zero ou fora do município são descartados na carga e contabilizados no relatório de validação.                                                                                                                    & RF20                   \\
+	RN11        & Indicadores com data de referência superior a 24 meses recebem o aviso ``dado desatualizado''.                                                                                                                                                                        & RF12                   \\
+	RN12        & A distância até o equipamento mais próximo é a distância geodésica em linha reta, em metros, entre o ponto do CEP e o ponto do equipamento; para áreas como parques, usa-se o ponto mais próximo do contorno. A interface identifica a medida como ``em linha reta''. & RF23                   \\
+	RN13        & A nota de cada tipo segue a Equação~\ref{eq:nota}, com os limiares do Quadro~\ref{qua:limiares}; os limiares são parâmetros de configuração alteráveis pelo administrador sem mudança de código.                                                                      & RF24                   \\
+	RN14        & O tempo estimado de caminhada é calculado à velocidade de 80 metros por minuto (4,8 km/h) e arredondado para o minuto inteiro superior.                                                                                                                               & RF23                   \\
+	RN15        & Tipo sem nenhum equipamento a menos da distância máxima recebe nota zero, e a interface informa ``nenhum equipamento deste tipo a menos de $b_j$ metros''.                                                                                                            & RF24                   \\
+	RN16        & O IPL é calculado sempre sobre a coordenada do endereço consultado, e nunca sobre o centroide do distrito ou do bairro.                                                                                                                                               & RF24                   \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+A regra RN09 transpõe para o sistema a advertência do manual de interpretação da SSP-SP sobre comparações apoiadas em poucos casos, e a regra RN07 materializa a opção, discutida na fundamentação, de não reduzir a qualidade de um território a um único número.
+
+\subsection{Casos de uso}
+
+Os requisitos funcionais foram agrupados em oito casos de uso principais, que orientam o diagrama de casos de uso e o desenho das telas:
+
+\begin{alineas}
+	\item \textbf{UC01 -- Consultar endereço}: o munícipe informa CEP ou endereço, e o sistema valida, geocodifica e identifica o distrito (RF01 a RF06);
+	\item \textbf{UC02 -- Visualizar diagnóstico socioespacial}: o sistema apresenta equipamentos do entorno, IVEP e indicadores de ocorrências, com fontes e datas (RF07, RF08, RF10 a RF12);
+	\item \textbf{UC02a -- Avaliar proximidade do endereço}: o sistema calcula a distância até o equipamento mais próximo de cada tipo e o IPL do endereço (RF23 a RF25);
+	\item \textbf{UC03 -- Personalizar prioridades}: o munícipe ajusta os pesos das categorias e acompanha o recálculo do IVEP (RF09);
+	\item \textbf{UC04 -- Explorar mapa ou tabela equivalente}: o munícipe navega pelo mapa ou pela tabela textual e filtra categorias (RF13 a RF15);
+	\item \textbf{UC05 -- Comparar localidades}: o munícipe compara até três endereços ou distritos (RF16);
+	\item \textbf{UC06 -- Compartilhar ou exportar diagnóstico}: o munícipe gera link ou arquivo do diagnóstico (RF17, RF18);
+	\item \textbf{UC07 -- Atualizar bases de dados}: o administrador executa as cargas, valida os registros e publica nova versão dos indicadores (RF19 a RF21).
+\end{alineas}
+
+\subsection{Histórias de usuário e critérios de aceitação}
+
+Para o planejamento das \emph{sprints}, os casos de uso foram desdobrados em histórias de usuário no formato ``Como \emph{papel}, quero \emph{ação}, para \emph{benefício}'' \cite{cohn2004}, estimadas em pontos de complexidade relativa (Quadro~\ref{qua:hu}).
+
+\begin{longtable}{C{1.2cm}L{9.0cm}C{2.1cm}C{1.3cm}}
+	\caption{Histórias de usuário}
+	\label{qua:hu}                                                                                                                                                                                                                             \\
+	\toprule
+	\textbf{ID} & \textbf{História}                                                                                                                                                                    & \textbf{Requisitos} & \textbf{Pontos} \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{ID} & \textbf{História}                                                                                                                                                                    & \textbf{Requisitos} & \textbf{Pontos} \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	HU01        & Como munícipe, quero digitar um CEP e ver o endereço reconhecido, para iniciar a consulta sem preencher formulários longos.                                                          & RF01, RF02          & 3               \\
+	HU02        & Como munícipe, quero saber em que distrito fica o endereço, para entender a região a que ele pertence.                                                                               & RF04--RF06          & 5               \\
+	HU03        & Como munícipe, quero ver praças, parques, feiras, transporte e serviços públicos a até 1 km, para saber se a vizinhança tem vida nas ruas.                                           & RF07, RF13          & 8               \\
+	HU04        & Como munícipe, quero ver o índice de vitalidade do distrito em comparação com a cidade, para avaliar a região de forma objetiva.                                                     & RF08                & 5               \\
+	HU05        & Como munícipe, quero ver as taxas oficiais de ocorrências com explicação sobre seus limites, para decidir com informação confiável e sem alarmismo.                                  & RF10--RF12          & 8               \\
+	HU06        & Como usuário de leitor de tela, quero acessar todo o conteúdo do mapa em forma de tabela e ser avisado quando a consulta terminar, para usar a plataforma com autonomia.             & RF14, RF15          & 5               \\
+	HU07        & Como munícipe, quero dar mais peso ao transporte do que ao lazer, para que o índice reflita minha rotina.                                                                            & RF09                & 5               \\
+	HU08        & Como munícipe, quero comparar três endereços lado a lado, para escolher entre as opções finais.                                                                                      & RF16                & 8               \\
+	HU09        & Como administrador, quero carregar e validar novas bases da SSP-SP e do GeoSampa, para manter os indicadores atualizados.                                                            & RF19, RF20          & 8               \\
+	HU10        & Como munícipe, quero saber a que distância do endereço ficam a UBS, a escola, a praça, o ponto de ônibus e a estação mais próximos, para avaliar se consigo fazer minha rotina a pé. & RF23, RF24          & 8               \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+Os critérios de aceitação são redigidos na sintaxe Gherkin (Dado, Quando, Então), o que permite convertê-los diretamente em testes automatizados de aceitação. A título de exemplo, a história HU01 é aceita quando todos os cenários a seguir forem atendidos:
+
+\begin{alineas}
+	\item \textbf{CEP válido}: \emph{dado} que o munícipe está na página inicial, \emph{quando} informa ``01310-100'', \emph{então} o sistema exibe ``Avenida Paulista, Bela Vista, São Paulo -- SP'';
+	\item \textbf{Formato inválido}: \emph{quando} informa ``1234'', \emph{então} o sistema exibe ``O CEP deve ter 8 dígitos'' e nenhuma API externa é chamada;
+	\item \textbf{CEP inexistente}: \emph{quando} informa ``99999-999'', \emph{então} o sistema exibe ``CEP não encontrado'' e oferece a consulta por endereço;
+	\item \textbf{Serviço principal indisponível}: \emph{dado} que o ViaCEP não responde em 3 segundos, \emph{quando} o munícipe informa um CEP válido, \emph{então} o endereço é obtido pelo serviço de contingência.
+\end{alineas}
+
+Considera-se uma história pronta para desenvolvimento (\emph{Definition of Ready}) quando possui critérios de aceitação escritos, estimativa acordada e dependências externas identificadas. Considera-se concluída (\emph{Definition of Done}) quando o código foi revisado, os testes unitários e de aceitação passam na integração contínua, a verificação de acessibilidade não aponta erros críticos e o incremento está implantado no ambiente em nuvem.
+
+\subsection{Priorização e planejamento incremental}
+
+As dez histórias totalizam 63 pontos, distribuídos em quatro \emph{sprints} de duas semanas, precedidas de uma \emph{sprint} de preparação do ambiente (Quadro~\ref{qua:sprints}). O MVP encerra-se ao fim da terceira \emph{sprint}, quando o fluxo completo de consulta e diagnóstico estará disponível para validação com os moradores.
+
+\begin{table}[htb]
+	\caption{Planejamento das \emph{sprints}}
+	\label{qua:sprints}
+	\centering
+	\small
+	\begin{tabularx}{\textwidth}{C{1.4cm}XC{3.2cm}C{1.4cm}}
+		\toprule
+		\textbf{Sprint} & \textbf{Meta}                                                                                  & \textbf{Histórias} & \textbf{Pontos} \\
+		\midrule
+		0               & Repositório, integração contínua, banco com PostGIS e primeira carga dos distritos do GeoSampa & --                 & --              \\
+		1               & Consultar um CEP e localizar o distrito                                                        & HU01, HU02, HU09   & 16              \\
+		2               & Exibir a infraestrutura do entorno e a distância ao equipamento mais próximo de cada tipo      & HU03, HU10         & 16              \\
+		3               & Calcular IVEP e indicadores de ocorrências, com mapa e tabela acessível (MVP)                  & HU04, HU05, HU06   & 18              \\
+		4               & Personalização de pesos, comparação e ajustes após testes com usuários                         & HU07, HU08         & 13              \\
+		\bottomrule
+	\end{tabularx}
+	\fonte{Elaborado pelo autor (2026).}
+\end{table}
+
+\subsection{Plano de testes}
+
+A estratégia de verificação segue a pirâmide de testes: grande volume de testes unitários sobre as regras de negócio, testes de integração sobre os adaptadores de dados e o banco geoespacial, e um conjunto reduzido de testes ponta a ponta sobre os fluxos críticos \cite{pressman2021}. Nos testes automatizados, os serviços externos são substituídos por simulações (\emph{mocks}), o que torna os resultados reprodutíveis; testes de contrato agendados verificam, separadamente, se o formato das respostas reais das APIs permanece inalterado. O Quadro~\ref{qua:niveis} apresenta os níveis de teste previstos.
+
+\begin{longtable}{L{2.6cm}L{5.0cm}L{3.5cm}L{3.0cm}}
+	\caption{Níveis e tipos de teste}
+	\label{qua:niveis}                                                                                                                                                                       \\
+	\toprule
+	\textbf{Nível} & \textbf{Objeto de verificação}                                  & \textbf{Ferramentas}                           & \textbf{Critério de saída}                           \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{Nível} & \textbf{Objeto de verificação}                                  & \textbf{Ferramentas}                           & \textbf{Critério de saída}                           \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	Unitário       & Regras RN01 a RN16, cálculo do IPL, do IVEP e das taxas         & pytest                                         & 100\% aprovados; cobertura $\geq$ 70\%               \\
+	Integração     & Adaptadores de CEP e geocodificação, consultas espaciais, cache & pytest com banco PostGIS em contêiner          & 100\% aprovados                                      \\
+	Contrato       & Formato das respostas de ViaCEP, BrasilAPI e Nominatim          & Execução diária agendada                       & Alerta em caso de divergência                        \\
+	Aceitação      & Cenários Gherkin das histórias de usuário                       & pytest-bdd ou Behave                           & Todas as histórias \emph{Must} aprovadas             \\
+	Ponta a ponta  & Fluxo consulta, diagnóstico, mapa e tabela                      & Playwright                                     & Aprovado em Chrome e Firefox                         \\
+	Desempenho     & RNF01 e RNF02                                                   & k6                                             & Metas de percentil 95 atendidas                      \\
+	Segurança      & RNF08 e RNF09                                                   & OWASP ZAP; pip-audit                           & Nenhum alerta alto                                   \\
+	Acessibilidade & RNF03 e RNF04                                                   & Lighthouse, axe, NVDA, Orca                    & Zero erros críticos                                  \\
+	Usabilidade    & RNF05 e aderência às necessidades levantadas                    & Teste moderado com moradores; questionário SUS & Tarefas concluídas por $\geq$ 80\% dos participantes \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+Os casos de teste derivam diretamente dos requisitos e das regras de negócio. O Quadro~\ref{qua:ct} relaciona os principais.
+
+\begin{longtable}{C{1.1cm}C{1.8cm}L{4.6cm}L{4.4cm}C{1.8cm}}
+	\caption{Casos de teste principais}
+	\label{qua:ct}                                                                                                                                                                                \\
+	\toprule
+	\textbf{ID} & \textbf{Requisito} & \textbf{Entrada ou condição}                                 & \textbf{Resultado esperado}                                                & \textbf{Tipo}  \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{ID} & \textbf{Requisito} & \textbf{Entrada ou condição}                                 & \textbf{Resultado esperado}                                                & \textbf{Tipo}  \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	CT01        & RF01, RN01         & ``1234'', ``abcdefgh'' e ``123456789''                       & Mensagem de formato inválido e nenhuma chamada externa                     & Unitário       \\
+	CT02        & RF02               & CEP 01310-100                                                & Logradouro, bairro e município preenchidos corretamente                    & Integração     \\
+	CT03        & RN02               & CEP 99999-999                                                & ``CEP não encontrado'' e consulta textual liberada                         & Integração     \\
+	CT04        & RN03, RNF06        & Serviço principal simulado com atraso de 5 s                 & Resposta obtida pelo serviço de contingência                               & Integração     \\
+	CT05        & RF05               & Coordenadas conhecidas no interior de três distritos         & Distrito correto em todos os casos                                         & Integração     \\
+	CT06        & RF06               & CEP de município vizinho                                     & Aviso de endereço fora de São Paulo                                        & Integração     \\
+	CT07        & RF07               & Ponto com equipamentos cadastrados a 300 m, 800 m e 1,5 km   & Os dois primeiros listados com distância; o terceiro ausente               & Integração     \\
+	CT08        & RF08, RN06         & Base fictícia com percentis conhecidos e pesos iguais        & IVEP igual à média aritmética dos percentis                                & Unitário       \\
+	CT09        & RF09               & Peso de mobilidade igual a 5 e demais iguais a 1             & IVEP recalculado conforme a Equação~\ref{eq:ivep}, sem recarregar a página & Ponta a ponta  \\
+	CT10        & RN08               & Distrito com 300 ocorrências em 3 anos e 100\,000 habitantes & Taxa de 100 por cem mil habitantes ao ano                                  & Unitário       \\
+	CT11        & RN09               & Natureza com 12 ocorrências na janela                        & ``Número insuficiente para comparação'', sem taxa                          & Unitário       \\
+	CT12        & RN07               & Resposta da API interna do diagnóstico                       & Ausência de qualquer campo que combine os dois conjuntos de indicadores    & Unitário       \\
+	CT13        & RN10, RF20         & Planilha com 5 registros de coordenadas nulas ou zeradas     & Registros descartados e contabilizados no relatório de carga               & Integração     \\
+	CT14        & RF14, RNF04        & Navegação apenas por teclado com leitor de tela              & Todos os equipamentos do mapa acessíveis pela tabela equivalente           & Acessibilidade \\
+	CT15        & RF15               & Consulta concluída e consulta com erro                       & Ambas anunciadas pela região viva                                          & Acessibilidade \\
+	CT16        & RNF08              & 61 requisições em um minuto a partir do mesmo IP             & A 61ª requisição recebe HTTP 429                                           & Segurança      \\
+	CT17        & RF23, RN12         & Ponto com duas UBS cadastradas a 250 m e a 600 m             & UBS mais próxima informada a 250 m, ``em linha reta''                      & Integração     \\
+	CT18        & RN13               & Ponto de ônibus a 550 m ($a_j = 300$, $b_j = 800$)           & Nota do tipo igual a 50                                                    & Unitário       \\
+	CT19        & RN14               & Distância de 650 m                                           & Tempo estimado de 9 minutos                                                & Unitário       \\
+	CT20        & RN15               & Nenhuma estação a menos de 2\,000 m                          & Nota zero e mensagem de ausência                                           & Unitário       \\
+	CT21        & RF24               & Notas de categoria 100, 50, 0, 80, 60 e 40, pesos iguais a 1 & IPL igual a 55                                                             & Unitário       \\
+	CT22        & RN16               & Dois CEPs distintos no mesmo distrito                        & IPL diferentes e mesmo IVEP                                                & Integração     \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}
+
+Os defeitos encontrados são registrados como \emph{issues} no repositório, classificados por severidade; defeitos críticos e altos impedem o encerramento da \emph{sprint}.
+
+\subsection{Matriz de rastreabilidade}
+
+A matriz de rastreabilidade (Quadro~\ref{qua:rastreab}) liga as necessidades identificadas junto à comunidade aos requisitos que as atendem e aos testes que comprovam seu cumprimento, permitindo avaliar o impacto de qualquer alteração de escopo.
+
+\begin{longtable}{L{4.8cm}L{4.2cm}C{2.0cm}C{2.6cm}}
+	\caption{Matriz de rastreabilidade}
+	\label{qua:rastreab}                                                                                                          \\
+	\toprule
+	\textbf{Necessidade}                                    & \textbf{Requisitos e regras}  & \textbf{História} & \textbf{Testes} \\
+	\midrule
+	\endfirsthead
+	\toprule
+	\textbf{Necessidade}                                    & \textbf{Requisitos e regras}  & \textbf{História} & \textbf{Testes} \\
+	\midrule
+	\endhead
+	\bottomrule
+	\endfoot
+	Consultar uma região de forma simples                   & RF01--RF06, RN01--RN05        & HU01, HU02        & CT01--CT06      \\
+	Saber a que distância ficam os serviços do dia a dia    & RF23--RF25, RN12--RN16        & HU10              & CT17--CT22      \\
+	Conhecer a infraestrutura pública do entorno            & RF07, RF13                    & HU03              & CT07            \\
+	Avaliar a vitalidade do espaço público                  & RF08, RF09, RN06              & HU04, HU07        & CT08, CT09      \\
+	Dispor de dados criminais auditáveis e contextualizados & RF10--RF12, RN07--RN09, RNF18 & HU05              & CT10--CT12      \\
+	Usar a plataforma com tecnologia assistiva              & RF14, RF15, RNF03, RNF04      & HU06              & CT14, CT15      \\
+	Manter os dados atualizados e íntegros                  & RF19, RF20, RN10              & HU09              & CT13            \\
+	Operar com segurança e desempenho                       & RNF01, RNF02, RNF08           & --                & CT16            \\
+\end{longtable}
+\vspace{-0.4cm}
+\fonte{Elaborado pelo autor (2026).}

@@ -1,0 +1,76 @@
+%% Modelo Entidade-Relacionamento do GeoHabita
+%% Renderizar: mmdc -i mer.mmd -o mer.pdf --pdfFit
+%%{init: {'theme':'neutral', 'themeVariables': {'fontFamily':'Arial'}}}%%
+erDiagram
+    DISTRITO ||--o{ EQUIPAMENTO : "contém"
+    DISTRITO ||--o{ OCORRENCIA : "registra"
+    DISTRITO ||--o{ INDICADOR_DISTRITO : "possui"
+    DISTRITO ||--o{ CEP_CACHE : "localiza"
+    CATEGORIA ||--|{ TIPO_EQUIPAMENTO : "agrupa"
+    TIPO_EQUIPAMENTO ||--o{ EQUIPAMENTO : "classifica"
+    CARGA_ETL ||--o{ INDICADOR_DISTRITO : "gera"
+    CARGA_ETL ||--o{ EQUIPAMENTO : "importa"
+    CARGA_ETL ||--o{ OCORRENCIA : "importa"
+
+    DISTRITO {
+        int id PK
+        string nome
+        string subprefeitura
+        int populacao_2022
+        float area_km2
+        geometry poligono
+    }
+    CATEGORIA {
+        int id PK
+        string nome
+        int peso_padrao
+    }
+    TIPO_EQUIPAMENTO {
+        int id PK
+        int categoria_id FK
+        string nome
+        int dist_ideal_m
+        int dist_maxima_m
+    }
+    EQUIPAMENTO {
+        int id PK
+        int tipo_id FK
+        int distrito_id FK
+        int carga_id FK
+        string nome
+        geometry localizacao
+        string fonte
+    }
+    OCORRENCIA {
+        int id PK
+        int distrito_id FK
+        int carga_id FK
+        string natureza
+        date data_ocorrencia
+        geometry localizacao
+    }
+    INDICADOR_DISTRITO {
+        int id PK
+        int distrito_id FK
+        int carga_id FK
+        string indicador
+        string subcategoria
+        float valor
+        date data_referencia
+    }
+    CARGA_ETL {
+        int id PK
+        string fonte
+        datetime executada_em
+        int registros_importados
+        int registros_descartados
+        string situacao
+    }
+    CEP_CACHE {
+        string cep PK
+        int distrito_id FK
+        string logradouro
+        geometry ponto
+        string servico_origem
+        datetime consultado_em
+    }

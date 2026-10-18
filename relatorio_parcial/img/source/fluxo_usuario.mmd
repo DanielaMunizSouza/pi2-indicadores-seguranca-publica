@@ -1,0 +1,23 @@
+%% Fluxo de uso do munícipe na plataforma
+%% Renderizar: mmdc -i fluxo_usuario.mmd -o fluxo_usuario.pdf --pdfFit
+%%{init: {'theme':'neutral', 'themeVariables': {'fontFamily':'Arial'}}}%%
+flowchart TD
+    A([Acessa o GeoHabita]) --> B[Informa CEP ou endereço]
+    B --> C{CEP válido e<br/>encontrado?}
+    C -- "Não" --> D[Recebe mensagem explicativa<br/>e digita o endereço]
+    D --> E
+    C -- "Sim" --> E{Endereço na cidade<br/>de São Paulo?}
+    E -- "Não" --> F([Aviso de cobertura<br/>apenas do município])
+    E -- "Sim" --> G[Visualiza o diagnóstico<br/>do endereço]
+    G --> H[Proximidade: equipamento<br/>mais próximo de cada tipo e IPL]
+    G --> I[Vitalidade do espaço<br/>público do distrito - IVEP]
+    G --> J[Taxas oficiais de ocorrências<br/>com fonte e ressalvas]
+    H --> K{Deseja ajustar<br/>prioridades?}
+    I --> K
+    J --> K
+    K -- "Sim" --> L[Altera pesos das categorias<br/>e vê o recálculo]
+    L --> M
+    K -- "Não" --> M{Deseja comparar<br/>outro endereço?}
+    M -- "Sim" --> N[Adiciona até três<br/>localidades à comparação]
+    N --> O
+    M -- "Não" --> O([Compartilha, exporta<br/>ou encerra a consulta])
