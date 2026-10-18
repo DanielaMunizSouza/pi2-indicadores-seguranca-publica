@@ -1,0 +1,25 @@
+# CommitCraft ignore patterns
+# Files matching these patterns will be excluded from the diff sent to the LLM
+# Uses fnmatch syntax (*, ?, [seq], [!seq])
+
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+
+# Add your custom patterns below:

@@ -1,0 +1,18 @@
+[context]
+project_name = "GeoHabita"
+project_language = "python, javascript, laTeX, html"
+project_description = ""
+commit_guidelines = "\n    - Never ask for follow-up questions.\n    - Don't ask questions.\n    - Don't talk about yourself.\n    - Be concise and clear.\n    - Be informative.\n    - Don't explain row by row just the global goal of the changes.\n    - Avoid unnecessary details and long explanations.\n    - Use action verbs.\n    - Use bullet points in the body if there are many changes\n    - Do not talk about the hashes.\n    - Create concise and comprehensive commit messages.\n    - Be direct about what changed and why. Focus on what.\n    - Give a small summary of what has changed and how it may affect the rest of the project.\n    - Do not return any explanation other than the commit message itself.\n    - If there are many changes focus on the main ones.\n    - The first row shall be the title of your message, so make it simple and informative.\n    - IMPORTANT: After the title, there must always be an empty line before any detailed description or body content.\n    - Do not introduce your message!\n\n    Example good message:\n   Fixed API leaking bug\n\n    - Removed the CallRawAPI class\n    - Added the APISecureCore class to handle authentication and requests\n    - Simplified key managment workflow to remove potential breach points\n    "
+
+[models]
+provider = "google"
+model = "models/gemini-3.5-flash-lite"
+
+[emoji]
+emoji_convention = ""
+
+[providers]
+
+[updates]
+check_enabled = true
+check_interval_days = 7
