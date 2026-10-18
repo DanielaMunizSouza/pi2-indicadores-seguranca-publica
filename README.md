@@ -40,7 +40,7 @@ Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (u
 
 ## Testes
 
-A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o comportamento esperado pela especificação de requisitos (`relatorio_parcial/requisitos_geohabita.tex`) antes da implementação.
+A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o comportamento esperado pela especificação de requisitos (`relatorio/requisitos_geohabita.tex`) antes da implementação.
 
 Instale as dependências de desenvolvimento:
 
