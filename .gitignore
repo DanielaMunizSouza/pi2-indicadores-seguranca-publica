@@ -239,3 +239,27 @@ data/tmp/
 # Arquivos temporários do Windows
 Thumbs.db
 data/processed/
+
+# Core LaTeX build artifacts 
+# (Texpile uses standard TeX tools under the hood, so these are required)
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# _draft
+relatorio_parcial/_draft/
