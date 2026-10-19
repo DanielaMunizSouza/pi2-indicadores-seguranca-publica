@@ -16,7 +16,10 @@ MAX_WEIGHT = 5
 
 def is_valid_weight(weight: float) -> bool:
     """Indica se o peso é um inteiro entre 0 e 5 (RN06)."""
-    raise NotImplementedError
+    # bool é subclasse de int, mas True/False não são pesos válidos.
+    if isinstance(weight, bool) or not float(weight).is_integer():
+        return False
+    return MIN_WEIGHT <= weight <= MAX_WEIGHT
 
 
 def public_space_vitality_index(
