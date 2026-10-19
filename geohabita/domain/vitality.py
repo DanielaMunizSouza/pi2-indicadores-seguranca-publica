@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from geohabita.domain.proximity import weighted_index
+
 DEFAULT_WEIGHT = 1
 MIN_WEIGHT = 0
 MAX_WEIGHT = 5
@@ -30,4 +32,4 @@ def public_space_vitality_index(
     Levanta ``ValueError`` quando as listas têm tamanhos diferentes ou quando
     a soma dos pesos é zero, casos em que o índice não está definido.
     """
-    raise NotImplementedError
+    return weighted_index(percentiles, weights)
