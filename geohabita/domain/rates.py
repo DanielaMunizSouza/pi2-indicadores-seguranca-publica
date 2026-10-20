@@ -39,7 +39,7 @@ def is_comparable(
     Naturezas com menos de 30 ocorrências na janela são exibidas como
     "número insuficiente para comparação", sem taxa nem tendência.
     """
-    raise NotImplementedError
+    return count >= minimum
 
 
 def complete_years_window(
