@@ -24,7 +24,11 @@ def annual_rate_per_100k(
     Levanta ``ValueError`` quando a população ou a janela de anos não são
     positivas, casos em que a taxa não está definida.
     """
-    raise NotImplementedError
+    if population <= 0:
+        raise ValueError("A população deve ser positiva.")
+    if years <= 0:
+        raise ValueError("A janela deve ter ao menos um ano.")
+    return count / (population * years) * POPULATION_BASE
 
 
 def is_comparable(
