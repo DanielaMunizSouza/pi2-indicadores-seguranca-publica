@@ -41,3 +41,10 @@ O importador reprocessa cada arquivo em transação, sem alterar os originais, e
 ## Interpretação
 
 As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma linha. Nem todos os registros têm CEP ou coordenadas. O mapa atribui pontos georreferenciados aos distritos pelo PostGIS; os registros sem coordenada permanecem nos indicadores gerais, mas não podem ser contados por área. As cores são faixas relativas entre distritos para os filtros escolhidos, não taxas populacionais. Ao filtrar por CEP, os registros georreferenciados são reunidos em um único distrito: o de maior concentração histórica de coordenadas daquele CEP, para evitar que coordenadas divergentes destaquem várias áreas. O resumo mantém o total de registros do CEP. Os distritos são limites administrativos oficiais, não polígonos de CEP ou bairros. A geometria de referência está em `data/reference/distritos_sp.geojson` e sua origem/licença estão documentadas em `data/reference/README.md`.
+
+## Licença
+
+O código-fonte deste projeto é disponibilizado sob a GNU Affero General Public License v3.0 (AGPL-3.0), conforme o arquivo LICENSE incluído na raiz deste repositório.
+
+Exceção de Licenciamento - Relatório Acadêmico:
+O documento acadêmico localizado no diretório /relatorio (e seus respectivos arquivos fonte em LaTeX, como o .tex) não é coberto pela AGPL-3.0. Este relatório é de autoria de Pedro Henrique Felix Gomes e retém Todos os Direitos Reservados. Você tem permissão para visualizar o documento público, mas a reprodução, modificação, distribuição de trabalhos derivados ou qualquer uso que exceda o fair use acadêmico (como citações devidamente referenciadas) não é permitida sem autorização explícita do autor.
