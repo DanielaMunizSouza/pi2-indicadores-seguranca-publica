@@ -8,6 +8,8 @@ mas nunca fundidos com os indicadores de infraestrutura (RN07, RNF18).
 
 from __future__ import annotations
 
+from datetime import date
+
 POPULATION_BASE = 100_000
 DEFAULT_WINDOW_YEARS = 3
 MIN_OCCURRENCES_FOR_COMPARISON = 30
@@ -32,5 +34,16 @@ def is_comparable(
 
     Naturezas com menos de 30 ocorrências na janela são exibidas como
     "número insuficiente para comparação", sem taxa nem tendência.
+    """
+    raise NotImplementedError
+
+
+def complete_years_window(
+    today: date, years: int = DEFAULT_WINDOW_YEARS
+) -> tuple[int, int]:
+    """Primeiro e último ano completos da janela móvel (RN08).
+
+    O ano corrente, ainda incompleto, nunca entra na janela: em qualquer data
+    de 2026, a janela trienal vai de 2023 a 2025.
     """
     raise NotImplementedError
