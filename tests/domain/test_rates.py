@@ -4,6 +4,8 @@ Os vetores reproduzem os casos CT10 (300 ocorrências em três anos para
 100 mil habitantes) e CT11 (12 ocorrências na janela) da especificação.
 """
 
+from datetime import date
+
 import pytest
 
 from geohabita.domain.rates import (
@@ -11,6 +13,7 @@ from geohabita.domain.rates import (
     INSUFFICIENT_DATA_MESSAGE,
     MIN_OCCURRENCES_FOR_COMPARISON,
     annual_rate_per_100k,
+    complete_years_window,
     is_comparable,
 )
 
@@ -53,3 +56,13 @@ def test_minimum_occurrences_constant():
 
 def test_insufficient_data_message():
     assert INSUFFICIENT_DATA_MESSAGE == "número insuficiente para comparação"
+
+
+@pytest.mark.parametrize("today", [date(2026, 1, 1), date(2026, 10, 28), date(2026, 12, 31)])
+def test_window_excludes_current_incomplete_year(today):
+    # RN08: três anos completos; o ano corrente não entra no cálculo
+    assert complete_years_window(today) == (2023, 2025)
+
+
+def test_window_length_follows_years_argument():
+    assert complete_years_window(date(2026, 6, 1), years=1) == (2025, 2025)
