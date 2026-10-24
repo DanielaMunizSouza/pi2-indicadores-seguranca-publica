@@ -44,7 +44,8 @@ As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma
 
 ## Licença
 
-O código-fonte deste projeto é disponibilizado sob a GNU Affero General Public License v3.0 (AGPL-3.0), conforme o arquivo LICENSE incluído na raiz deste repositório.
+O código-fonte deste projeto é disponibilizado sob a *GNU Affero General Public License v3.0 (AGPL-3.0)*, conforme o arquivo LICENSE incluído na raiz deste repositório.
 
-Exceção de Licenciamento - Relatório Acadêmico:
-O documento acadêmico localizado no diretório /relatorio (e seus respectivos arquivos fonte em LaTeX, como o .tex) não é coberto pela AGPL-3.0. Este relatório é de autoria de Pedro Henrique Felix Gomes e retém Todos os Direitos Reservados. Você tem permissão para visualizar o documento público, mas a reprodução, modificação, distribuição de trabalhos derivados ou qualquer uso que exceda o fair use acadêmico (como citações devidamente referenciadas) não é permitida sem autorização explícita do autor.
+*Exceção de Licenciamento - Relatório Acadêmico:*
+
+O documento acadêmico localizado no diretório `/relatorio` (e seus respectivos arquivos fonte em LaTeX, como o `.tex`) *não* é coberto pela AGPL-3.0. Este relatório é de autoria dos pesquisadores listados em seu conteúdo e retém *Todos os Direitos Reservados* aos mesmos. Você tem permissão para visualizar o documento público, mas a reprodução, modificação, distribuição de trabalhos derivados ou qualquer uso que exceda o fair use acadêmico (como citações devidamente referenciadas) não é permitida sem autorização explícita dos autores.
