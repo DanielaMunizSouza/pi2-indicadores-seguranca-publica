@@ -76,9 +76,10 @@ py -m pytest --cov=geohabita
 A especificação, os testes e o código são organizados por regra:
 
 - `geohabita/domain/` reúne as regras de negócio puras, sem acesso a banco de dados, rede ou interface.
-- `tests/domain/` reúne os testes unitários correspondentes, com referência à regra (RN), ao requisito (RF/RNF) ou ao caso de teste (CT) da especificação.
+- `geohabita/application/` reúne os casos de uso que coordenam o domínio e os serviços externos, recebidos como dependências para que possam ser substituídos por dublês nos testes.
+- `tests/domain/` e `tests/application/` reúnem os testes correspondentes, com referência à regra (RN), ao requisito (RF/RNF) ou ao caso de teste (CT) da especificação.
 
-Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (validação e normalização de CEP), `thresholds.py` (limiares de distância por tipo de equipamento), `proximity.py` (nota por tipo, tempo de caminhada e IPL), `vitality.py` (IVEP) e `rates.py` (taxas oficiais de ocorrências). No momento, as funções de cálculo ainda são contratos que levantam `NotImplementedError`, de modo que a suíte permanece em estado vermelho até a implementação. O alvo de cobertura de 70% das regras de negócio vem do RNF11.
+Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (validação e normalização de CEP), `thresholds.py` (limiares de distância por tipo de equipamento), `proximity.py` (nota por tipo, tempo de caminhada e IPL), `vitality.py` (IVEP), `rates.py` (taxas oficiais de ocorrências e janela de anos completos), `territory.py` (endereço fora do município), `freshness.py` (validade do cache e dado desatualizado), `data_quality.py` (descarte de coordenadas na carga), `equipment.py` (equipamentos do entorno) e `diagnosis.py` (blocos separados do diagnóstico). Na camada de aplicação, `cep_lookup.py` cobre a consulta de CEP com contingência e cache, e `rate_limit.py`, o limite de requisições por IP. No momento, as funções de cálculo ainda são contratos que levantam `NotImplementedError`, de modo que a suíte permanece em estado vermelho até a implementação. O alvo de cobertura de 70% das regras de negócio vem do RNF11.
 
 ## Dados
 
