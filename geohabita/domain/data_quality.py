@@ -22,7 +22,14 @@ OUTSIDE = "fora do município"
 
 def discard_reason(lat: float | None, lon: float | None) -> str | None:
     """Motivo do descarte da coordenada, ou ``None`` se ela for utilizável."""
-    raise NotImplementedError
+    if lat is None or lon is None:
+        return MISSING
+    if lat == 0 or lon == 0:
+        return ZERO
+    west, south, east, north = SAO_PAULO_BBOX
+    if not (west <= lon <= east and south <= lat <= north):
+        return OUTSIDE
+    return None
 
 
 @dataclass
@@ -34,11 +41,18 @@ class ValidationReport:
 
     @property
     def total_discarded(self) -> int:
-        raise NotImplementedError
+        return sum(self.discarded.values())
 
 
 def validate_coordinates(
     rows: Iterable[tuple[float | None, float | None]],
 ) -> ValidationReport:
     """Classifica cada par (latitude, longitude) e devolve o relatório (RN10)."""
-    raise NotImplementedError
+    report = ValidationReport()
+    for lat, lon in rows:
+        reason = discard_reason(lat, lon)
+        if reason is None:
+            report.accepted += 1
+        else:
+            report.discarded[reason] += 1
+    return report
