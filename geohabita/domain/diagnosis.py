@@ -24,4 +24,5 @@ def build_diagnosis(
     Cada bloco é copiado sem alteração; nenhum campo derivado de mais de um
     bloco é acrescentado.
     """
-    raise NotImplementedError
+    blocks = (proximity, vitality, occurrences)
+    return {name: dict(block) for name, block in zip(DIAGNOSIS_BLOCKS, blocks)}
