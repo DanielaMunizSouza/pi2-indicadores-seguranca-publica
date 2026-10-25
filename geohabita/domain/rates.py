@@ -50,4 +50,5 @@ def complete_years_window(
     O ano corrente, ainda incompleto, nunca entra na janela: em qualquer data
     de 2026, a janela trienal vai de 2023 a 2025.
     """
-    raise NotImplementedError
+    last_complete = today.year - 1
+    return last_complete - years + 1, last_complete
