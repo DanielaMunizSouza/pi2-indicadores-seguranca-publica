@@ -26,6 +26,7 @@ WFS = "https://wfs.geosampa.prefeitura.sp.gov.br/geoserver/ows"
 RAIZ = Path(__file__).resolve().parent.parent
 SCRIPTS = Path(__file__).resolve().parent
 PAGINA = 5000
+LOTE = 20000
 
 # camada GeoSampa -> (categoria do IVEP, tipo de equipamento). Categorias e tipos seguem
 # geohabita/domain/thresholds.py. Fora da lista: "praca" (a camada GEOSAMPA_v_praca_largo falha
@@ -48,8 +49,10 @@ CAMADAS = {
     "equipamento_saude_ubs_posto_centro": ("servicos_essenciais", "unidade_basica_saude"),
     "equipamento_educacao_rede_publica": ("servicos_essenciais", "escola_publica"),
     "equipamento_praca_wifi": ("conectividade", "wifi_publico"),
+    # ~663 mil pontos; "iluminacao_publica" ainda não tem limiares em thresholds.py, então
+    # é carregada mas não entra nos cálculos de IPL/IVEP.
+    "iluminacao_publica": ("conectividade", "iluminacao_publica"),
 }
-OPCIONAIS = {"iluminacao_publica": ("conectividade", "iluminacao_publica")}  # camada muito grande
 
 
 def requisitar(url, tentativas=3):
@@ -86,7 +89,7 @@ def baixar_camada(camada, destino):
 def etapa_geosampa_baixar(args):
     pasta = RAIZ / "data/raw/geosampa"
     pasta.mkdir(parents=True, exist_ok=True)
-    camadas = dict(CAMADAS, **(OPCIONAIS if args.com_iluminacao else {}))
+    camadas = CAMADAS
     falhas = []
     for camada in camadas:
         destino = pasta / f"{camada}.geojson"
@@ -118,7 +121,7 @@ def cep_limpo(valor):
 def etapa_geosampa_carregar(args):
     import psycopg
     pasta = RAIZ / "data/raw/geosampa"
-    camadas = dict(CAMADAS, **OPCIONAIS)
+    camadas = CAMADAS
     sql = ("INSERT INTO public.equipamento_publico (categoria,tipo,camada,identificador,nome,endereco,cep,geometria) "
            "VALUES (%s,%s,%s,%s,%s,%s,%s,ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326))) "
            "ON CONFLICT (camada,identificador) DO UPDATE SET categoria=EXCLUDED.categoria,tipo=EXCLUDED.tipo,"
@@ -134,13 +137,14 @@ def etapa_geosampa_carregar(args):
                 if not f.get("geometry"):
                     continue
                 p = f["properties"]
-                ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia", "cd_equipamento") or f.get("id") or str(i)
+                ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia", "cd_identificador_iluminacao_publica", "cd_equipamento") or f.get("id") or str(i)
                 linhas.append((categoria, tipo, camada, ident,
-                               primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem", "nm_trecho_via_bicicleta", "nm_parque", "nm_terminal_onibus"),
-                               primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus"),
+                               primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem", "nm_trecho_via_bicicleta", "cd_placa", "nm_parque", "nm_terminal_onibus"),
+                               primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus", "tx_endereco"),
                                cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"])))
-            with conn.transaction(), conn.cursor() as cur:
-                cur.executemany(sql, linhas)
+            for i in range(0, len(linhas), LOTE):  # lotes: a iluminação tem ~663 mil linhas
+                with conn.transaction(), conn.cursor() as cur:
+                    cur.executemany(sql, linhas[i:i + LOTE])
             print(f"{camada}: {len(linhas):,} equipamentos")
 
 
@@ -185,7 +189,6 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--etapas", nargs="+", choices=ETAPAS, default=PADRAO)
     p.add_argument("--refazer", action="store_true", help="baixa novamente camadas já existentes")
-    p.add_argument("--com-iluminacao", action="store_true", help="inclui a camada iluminacao_publica (grande)")
     p.add_argument("--populacao-csv")
     p.add_argument("--ssp-destino", default=str(RAIZ / "data/raw/ssp"), help="pasta de trabalho da SSP (xlsx/, csv/)")
     p.add_argument("--desde", type=int, default=2022, help="primeiro ano das bases SSP (padrão 2022)")
