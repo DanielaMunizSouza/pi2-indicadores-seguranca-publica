@@ -52,14 +52,14 @@ CAMADAS = {
 OPCIONAIS = {"iluminacao_publica": ("conectividade", "iluminacao_publica")}  # camada muito grande
 
 
-def requisitar(url, tentativas=4):
+def requisitar(url, tentativas=3):
     for n in range(tentativas):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "geohabita-pipeline/0.1"})
             with urllib.request.urlopen(req, timeout=120) as r:
                 return json.load(r)
         except Exception as erro:
-            if n == tentativas - 1:
+            if n == tentativas - 1 or getattr(erro, "code", 0) == 500:  # 500 do GeoSampa costuma ser permanente
                 raise
             print(f"  nova tentativa ({erro})", file=sys.stderr)
             time.sleep(2 ** (n + 1))
@@ -87,12 +87,19 @@ def etapa_geosampa_baixar(args):
     pasta = RAIZ / "data/raw/geosampa"
     pasta.mkdir(parents=True, exist_ok=True)
     camadas = dict(CAMADAS, **(OPCIONAIS if args.com_iluminacao else {}))
+    falhas = []
     for camada in camadas:
         destino = pasta / f"{camada}.geojson"
         if destino.exists() and not args.refazer:
             print(f"{camada}: já baixada (use --refazer)")
             continue
-        print(f"{camada}: {baixar_camada(camada, destino):,} feições")
+        try:
+            print(f"{camada}: {baixar_camada(camada, destino):,} feições")
+        except Exception as erro:  # uma camada fora do ar não deve impedir as demais
+            print(f"{camada}: PULADA ({erro})", file=sys.stderr)
+            falhas.append(camada)
+    if falhas:
+        print(f"Camadas não baixadas (erro no servidor do GeoSampa; rode de novo mais tarde): {', '.join(falhas)}", file=sys.stderr)
 
 
 def primeiro(props, *nomes):
