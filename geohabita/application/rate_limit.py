@@ -7,6 +7,7 @@ públicas (RNF08). Requisições acima do limite recebem HTTP 429.
 from __future__ import annotations
 
 import time
+from collections import deque
 from collections.abc import Callable
 
 REQUESTS_PER_WINDOW = 60
@@ -25,7 +26,15 @@ class RateLimiter:
         self.limit = limit
         self.window_s = window_s
         self.clock = clock
+        self._requests: dict[str, deque[float]] = {}
 
     def allow(self, client: str) -> bool:
         """Registra a requisição e indica se ela está dentro do limite."""
-        raise NotImplementedError
+        now = self.clock()
+        requests = self._requests.setdefault(client, deque())
+        while requests and now - requests[0] >= self.window_s:
+            requests.popleft()
+        if len(requests) >= self.limit:
+            return False
+        requests.append(now)
+        return True
