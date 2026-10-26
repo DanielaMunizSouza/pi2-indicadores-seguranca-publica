@@ -8,6 +8,8 @@ mas nunca fundidos com os indicadores de infraestrutura (RN07, RNF18).
 
 from __future__ import annotations
 
+import unicodedata
+from collections.abc import Sequence
 from datetime import date
 
 POPULATION_BASE = 100_000
@@ -52,3 +54,70 @@ def complete_years_window(
     """
     last_complete = today.year - 1
     return last_complete - years + 1, last_complete
+
+
+SUBNOTIFICATION_NOTICE = (
+    "Os registros policiais não incluem crimes não comunicados à polícia "
+    "(subnotificação), que variam por tipo de crime e por região. "
+    "Uma taxa menor não significa necessariamente menos crimes."
+)
+
+# Grupos de natureza exibidos (RF10). Cada grupo é uma taxa à parte e os grupos
+# nunca são somados: o roubo de celular também aparece em "roubo".
+OCCURRENCE_GROUPS: dict[str, str] = {
+    "roubo": "Roubo (exceto de veículo)",
+    "furto": "Furto",
+    "roubo_celular": "Roubo de celular",
+    "roubo_veiculo": "Roubo de veículo",
+    "crimes_contra_vida": "Crimes contra a vida",
+}
+# Naturezas do SPDadosCriminais (comparadas sem acento e em maiúsculas).
+_CRIMES_CONTRA_VIDA = {"HOMICIDIO DOLOSO", "LATROCINIO", "LESAO CORPORAL SEGUIDA DE MORTE"}
+TREND_TOLERANCE = 0.10
+
+
+def _normalized(text: str | None) -> str:
+    text = unicodedata.normalize("NFD", (text or "").upper())
+    return "".join(c for c in text if unicodedata.category(c) != "Mn").strip()
+
+
+def occurrence_group(dataset: str, natureza: str | None, rubrica: str | None) -> str | None:
+    """Grupo de natureza (RF10) de um registro, ou ``None`` se ele não entra nas taxas.
+
+    ``dataset`` é a ``categoria_dado`` do registro: as naturezas vêm do
+    SPDadosCriminais; o roubo de celular vem da rubrica da base de celulares,
+    porque o SPDados não o separa.
+    """
+    if dataset == "celulares_subtraidos":
+        return "roubo_celular" if _normalized(rubrica).startswith("ROUBO") else None
+    if dataset != "criminal":
+        return None
+    nature = _normalized(natureza)
+    if nature == "ROUBO DE VEICULO":
+        return "roubo_veiculo"
+    if nature.startswith("ROUBO"):
+        return "roubo"
+    if nature.startswith("FURTO"):
+        return "furto"
+    if nature in _CRIMES_CONTRA_VIDA:
+        return "crimes_contra_vida"
+    return None
+
+
+def trend_direction(values: Sequence[float]) -> str:
+    """Tendência da série anual: compara o último ano com o primeiro.
+
+    Variação de ao menos 10% para cima é "alta", para baixo é "queda";
+    abaixo disso, "estável".
+    """
+    if len(values) < 2:
+        raise ValueError("A tendência precisa de ao menos dois anos.")
+    first, last = values[0], values[-1]
+    if first == 0:
+        return "alta" if last > 0 else "estável"
+    change = (last - first) / first
+    if change >= TREND_TOLERANCE - 1e-12:
+        return "alta"
+    if change <= -TREND_TOLERANCE + 1e-12:
+        return "queda"
+    return "estável"
