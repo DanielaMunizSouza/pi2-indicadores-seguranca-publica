@@ -3,9 +3,9 @@
 Sem argumentos, executa TODAS as etapas. Use `--etapas` para rodar só algumas.
 As etapas rodam em paralelo quando não dependem umas das outras:
 
-  distritos ──> ibge-populacao ─────────────────┐
-  geosampa-baixar ──> geosampa-carregar         ├──> resumo
-  ssp-baixar ──> ssp-carregar ──────────────────┘
+  distritos ──> ibge-populacao ─────────────────────────────┐
+  geosampa-baixar ──> geosampa-carregar ────────────────────┤
+  ssp-baixar ──> ssp-carregar ──> resumo ──> indicadores <──┘
 
   distritos          importa os 96 distritos (data/reference)
   ibge-populacao     baixa o Censo 2022 por distrito (IBGE) e grava distrito_municipal_sp.populacao_2022
@@ -13,7 +13,8 @@ As etapas rodam em paralelo quando não dependem umas das outras:
   geosampa-carregar  carrega equipamentos em public.equipamento_publico
   ssp-baixar         baixa os XLSX da SSP-SP (só o que mudou), filtra a capital e converte em CSV
   ssp-carregar       importa os CSVs da SSP-SP em registro_ocorrencia (só os que mudaram)
-  resumo             recalcula as tabelas de resumo usadas pelo mapa
+  resumo             grava o distrito das ocorrências novas e recalcula os resumos do mapa
+  indicadores        pré-calcula percentis do IVEP e ocorrências por natureza (indicador_distrito)
 
 Escopo padrão da SSP: SPDadosCriminais, CelularesSubtraidos e MDIP, últimos três anos completos,
 só o município de São Paulo. Amplie com --fontes, --desde/--ate, --com-ano-corrente, --todo-estado.
@@ -273,6 +274,11 @@ def etapa_resumo(args, progresso):
     atualizar_resumo_distritos.main()
 
 
+def etapa_indicadores(args, progresso):
+    import atualizar_indicadores
+    atualizar_indicadores.main()
+
+
 def etapa_ssp_baixar(args, progresso):
     argv = ["--destino", args.ssp_destino, "--workers", str(args.workers), "--fontes", *args.fontes]
     if args.desde is not None:
@@ -302,12 +308,14 @@ ETAPAS = {
     "ssp-baixar": etapa_ssp_baixar,
     "ssp-carregar": etapa_ssp_carregar,
     "resumo": etapa_resumo,
+    "indicadores": etapa_indicadores,
 }
 DEPENDE = {
     "ibge-populacao": ["distritos"],
     "geosampa-carregar": ["geosampa-baixar"],
     "ssp-carregar": ["ssp-baixar"],
     "resumo": ["distritos", "ssp-carregar"],
+    "indicadores": ["ibge-populacao", "geosampa-carregar", "resumo"],
 }
 
 
