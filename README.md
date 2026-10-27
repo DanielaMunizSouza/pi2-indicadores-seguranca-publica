@@ -44,8 +44,15 @@ As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma
 
 ## Licença
 
-O código-fonte deste projeto é disponibilizado sob a *GNU Affero General Public License v3.0 (AGPL-3.0)*, conforme o arquivo LICENSE incluído na raiz deste repositório.
+Este repositório usa duas licenças, conforme o tipo de conteúdo:
 
-*Exceção de Licenciamento - Relatório Acadêmico:*
+| Conteúdo | Licença |
+|---|---|
+| Código-fonte e software (tudo fora dos diretórios do relatório) | [GNU AGPL-3.0](LICENSE) |
+| Relatório acadêmico: diretórios `relatorio/` e `relatorio_parcial/` (fontes LaTeX, bibliografia, figuras, fontes dos diagramas e PDFs gerados) | [CC BY-ND 4.0](https://creativecommons.org/licenses/by-nd/4.0/deed.pt-br) |
 
-O documento acadêmico localizado no diretório `/relatorio` (e seus respectivos arquivos fonte em LaTeX, como o `.tex`) *não* é coberto pela AGPL-3.0. Este relatório é de autoria dos pesquisadores listados em seu conteúdo e retém *Todos os Direitos Reservados* aos mesmos. Você tem permissão para visualizar o documento público, mas a reprodução, modificação, distribuição de trabalhos derivados ou qualquer uso que exceda o fair use acadêmico (como citações devidamente referenciadas) não é permitida sem autorização explícita dos autores.
+**Código (AGPL-3.0):** o software é livre para uso, estudo, modificação e redistribuição nos termos do arquivo `LICENSE`. Quem disponibilizar uma versão modificada para uso por rede deve oferecer o código-fonte correspondente aos usuários.
+
+**Relatório (CC BY-ND 4.0):** o relatório pode ser copiado e redistribuído livremente, em qualquer meio ou formato, inclusive para fins comerciais, desde que integralmente, sem alterações e com a atribuição aos autores. Não é permitido distribuir versões modificadas ou obras derivadas do texto. O conteúdo é definido exclusivamente pelos autores, que são as pessoas identificadas como autoras no arquivo `.tex` principal e no PDF final do relatório, incluindo quem vier a ser acrescentado nessas listas. Citações com a devida referência continuam permitidas nos termos do art. 46 da Lei nº 9.610/1998. Detalhes em `relatorio/LICENSE.md`.
+
+**Exceções:** materiais de terceiros mantêm as licenças originais, por exemplo a classe abnTeX2 (`abntex2_ref.cls`, LPPL 1.3c), o texto da AGPL (`AGPL.tex`, © Free Software Foundation) e os dados de `data/reference/` (ver `data/reference/README.md`).
