@@ -1,10 +1,11 @@
-import os, re
+import os
 from datetime import date
 from pathlib import Path
 import psycopg
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from psycopg.rows import dict_row
+from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
 
 ROOT=Path(__file__).resolve().parents[1]
 # Read local configuration when present; environment variables still take precedence.
@@ -34,8 +35,8 @@ def make_where(start,end,cep,category,include_city=True):
     clauses.extend(["data_ocorrencia >= %s","data_ocorrencia <= %s"])
     values.extend([start,end])
     if cep:
-        digits=re.sub(r"\D","",cep)
-        if len(digits)!=8: raise HTTPException(400,"Digite um CEP com 8 dígitos.")
+        try: digits=require_valid_cep(cep)
+        except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
         clauses.append("cep = %s"); values.append(digits)
     if category: clauses.append("categoria_dado = %s"); values.append(category)
     return " AND ".join(clauses),values
@@ -99,7 +100,7 @@ def area_stats(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31))
     cep_area=None
     cep_distrito=None
     if cep:
-        cep_digitos=re.sub(r"\D","",cep)
+        cep_digitos=normalize_cep(cep)
     try:
         with connect() as conn:
             if cep:
