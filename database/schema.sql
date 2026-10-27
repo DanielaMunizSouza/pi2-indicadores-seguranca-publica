@@ -84,3 +84,22 @@ CREATE TABLE IF NOT EXISTS public.carga_etl (
 );
 CREATE INDEX IF NOT EXISTS ix_carga_arquivo ON public.carga_etl(arquivo,executada_em DESC);
 ALTER TABLE public.carga_etl ADD COLUMN IF NOT EXISTS assinatura text;
+-- Distrito do local do fato, calculado uma vez por ocorrência pela rotina de resumo
+-- (ponto-em-polígono). Tabela estreita e só de inserção: atualizar a tabela grande
+-- regravaria cada linha e todos os seus índices. Recarregar um arquivo apaga em cascata.
+CREATE TABLE IF NOT EXISTS public.ocorrencia_distrito (
+ id bigint PRIMARY KEY REFERENCES public.registro_ocorrencia(id) ON DELETE CASCADE,
+ codigo_distrito text NOT NULL REFERENCES public.distrito_municipal_sp(codigo_distrito)
+);
+-- Indicadores pré-calculados por distrito (scripts/atualizar_indicadores.py).
+--  indicador: equipamentos | densidade_km2 | densidade_10k_hab | percentil | ocorrencias
+--  subcategoria: categoria de equipamento ou grupo de natureza; ano = 0 quando não se aplica.
+CREATE TABLE IF NOT EXISTS public.indicador_distrito (
+ codigo_distrito text NOT NULL REFERENCES public.distrito_municipal_sp(codigo_distrito),
+ indicador text NOT NULL, subcategoria text NOT NULL, ano smallint NOT NULL DEFAULT 0,
+ valor double precision NOT NULL, atualizado_em timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(codigo_distrito,indicador,subcategoria,ano)
+);
+-- Busca de vizinhos do diagnóstico sem percorrer os ~663 mil postes de iluminação.
+CREATE INDEX IF NOT EXISTS ix_equipamento_geometria_diagnostico ON public.equipamento_publico
+ USING gist(geometria) WHERE tipo <> 'iluminacao_publica';

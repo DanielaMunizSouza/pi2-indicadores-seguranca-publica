@@ -43,6 +43,9 @@ def main() -> None:
         )""")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_distrito_municipal_sp_geometria "
                      "ON public.distrito_municipal_sp USING gist(geometria)")
+        impressao = """SELECT md5(COALESCE(string_agg(codigo_distrito || ST_AsEWKB(geometria)::text, ''
+                            ORDER BY codigo_distrito), '')) FROM public.distrito_municipal_sp"""
+        antes = conn.execute(impressao).fetchone()[0]
         with conn.cursor() as cur:
             cur.executemany("""INSERT INTO public.distrito_municipal_sp
                 (codigo_distrito,nome_distrito,regiao,atualizado_em,geometria)
@@ -52,6 +55,12 @@ def main() -> None:
                   nome_distrito=EXCLUDED.nome_distrito,regiao=EXCLUDED.regiao,
                   atualizado_em=EXCLUDED.atualizado_em,geometria=EXCLUDED.geometria""",
                               distritos)
+        if conn.execute(impressao).fetchone()[0] != antes:
+            # Limites mudaram: o distrito gravado nas ocorrências precisa ser recalculado.
+            existe = conn.execute("SELECT to_regclass('public.ocorrencia_distrito')").fetchone()[0]
+            if existe:
+                conn.execute("TRUNCATE public.ocorrencia_distrito")
+                print("Limites alterados: o distrito das ocorrências será recalculado no resumo.")
         conn.commit()
     print(f"Limites oficiais importados: {len(distritos)} distritos.")
 

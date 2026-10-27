@@ -11,6 +11,9 @@ from backend.app import DB_URL, MUNICIPIOS_SP
 
 def main() -> None:
     with psycopg.connect(DB_URL) as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS public.ocorrencia_distrito (
+            id bigint PRIMARY KEY REFERENCES public.registro_ocorrencia(id) ON DELETE CASCADE,
+            codigo_distrito text NOT NULL REFERENCES public.distrito_municipal_sp(codigo_distrito))""")
         conn.execute("""CREATE TABLE IF NOT EXISTS public.resumo_distrito_diario (
             codigo_distrito text NOT NULL REFERENCES public.distrito_municipal_sp(codigo_distrito),
             data_ocorrencia date NOT NULL,
@@ -53,22 +56,31 @@ def main() -> None:
             WHERE municipio=ANY(%s) AND data_ocorrencia IS NOT NULL
             GROUP BY data_ocorrencia,categoria_dado,COALESCE(cep,'')""",(MUNICIPIOS_SP,))
         conn.execute("ANALYZE public.resumo_ocorrencia_diario")
-        conn.execute("""WITH base AS MATERIALIZED (
-              SELECT id,data_ocorrencia,categoria_dado,COALESCE(cep,'') AS cep,localizacao
-              FROM public.registro_ocorrencia
-              WHERE municipio=ANY(%s) AND data_ocorrencia IS NOT NULL
-                AND localizacao IS NOT NULL
-            )
-            INSERT INTO public.resumo_distrito_diario
+        # O distrito de cada ocorrência é calculado uma vez; nas execuções seguintes
+        # só as linhas novas (recém-importadas) passam pelo ponto-em-polígono.
+        # Polígonos subdivididos (no máximo 128 vértices) tornam o ST_Contains muito mais barato.
+        conn.execute("""CREATE TEMP TABLE distrito_parte ON COMMIT DROP AS
+            SELECT codigo_distrito, ST_Subdivide(geometria, 128) AS geom FROM public.distrito_municipal_sp""")
+        conn.execute("CREATE INDEX ON distrito_parte USING gist(geom)")
+        conn.execute("ANALYZE distrito_parte")
+        # MATERIALIZED força a ordem: primeiro separa as linhas ainda sem distrito, depois
+        # aplica a geometria só nelas (senão o planejador cruza a tabela inteira com os polígonos).
+        atribuidas=conn.execute("""WITH novas AS MATERIALIZED (
+                SELECT r.id, r.localizacao FROM public.registro_ocorrencia r
+                WHERE r.localizacao IS NOT NULL AND r.municipio=ANY(%s)
+                  AND NOT EXISTS (SELECT 1 FROM public.ocorrencia_distrito o WHERE o.id = r.id))
+            INSERT INTO public.ocorrencia_distrito (id, codigo_distrito)
+            SELECT DISTINCT ON (n.id) n.id, p.codigo_distrito
+            FROM novas n JOIN distrito_parte p ON p.geom && n.localizacao AND ST_Contains(p.geom, n.localizacao)
+            ORDER BY n.id, p.codigo_distrito""", (MUNICIPIOS_SP,)).rowcount
+        print(f"Distrito atribuído a {atribuidas:,} ocorrências novas.")
+        conn.execute("ANALYZE public.ocorrencia_distrito")
+        conn.execute("""INSERT INTO public.resumo_distrito_diario
               (codigo_distrito,data_ocorrencia,categoria_dado,cep,registros)
-            SELECT d.codigo_distrito,b.data_ocorrencia,b.categoria_dado,b.cep,count(*)
-            FROM base b
-            JOIN LATERAL (
-              SELECT codigo_distrito FROM public.distrito_municipal_sp
-              WHERE geometria && b.localizacao AND ST_Contains(geometria,b.localizacao)
-              LIMIT 1
-            ) d ON TRUE
-            GROUP BY d.codigo_distrito,b.data_ocorrencia,b.categoria_dado,b.cep""",
+            SELECT o.codigo_distrito,r.data_ocorrencia,r.categoria_dado,COALESCE(r.cep,''),count(*)
+            FROM public.registro_ocorrencia r JOIN public.ocorrencia_distrito o USING (id)
+            WHERE r.municipio=ANY(%s) AND r.data_ocorrencia IS NOT NULL
+            GROUP BY o.codigo_distrito,r.data_ocorrencia,r.categoria_dado,COALESCE(r.cep,'')""",
                      (MUNICIPIOS_SP,))
         conn.execute("ANALYZE public.resumo_distrito_diario")
         row=conn.execute("SELECT count(*) AS grupos,COALESCE(sum(registros),0) AS registros "
