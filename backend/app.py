@@ -5,7 +5,10 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from psycopg.rows import dict_row
+from geohabita.application.cep_lookup import CepLookup,CepNotFoundError,ProviderError
 from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
+from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE,OUT_OF_CITY_MESSAGE,is_sao_paulo
+from geohabita.infrastructure.cep_providers import brasilapi,viacep
 
 ROOT=Path(__file__).resolve().parents[1]
 # Read local configuration when present; environment variables still take precedence.
@@ -49,6 +52,20 @@ def status():
     with connect() as conn:
         row=conn.execute("SELECT PostGIS_Full_Version() AS postgis, EXISTS(SELECT 1 FROM public.registro_ocorrencia LIMIT 1) AS tem_registros").fetchone()
     return {"banco":"conectado",**row}
+
+# ViaCEP é o serviço principal; a BrasilAPI responde quando ele falha ou demora (RN03).
+cep_service=CepLookup(viacep,brasilapi)
+
+@app.get("/api/cep/{cep}")
+def cep_address(cep:str):
+    try: address=cep_service.lookup(cep)
+    except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
+    except CepNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
+    except ProviderError as exc: raise HTTPException(503,"Os serviços de CEP estão indisponíveis. Tente novamente em instantes.") from exc
+    inside=is_sao_paulo(address.ibge_code)
+    return {"cep":address.cep,"logradouro":address.street,"bairro":address.neighbourhood,"municipio":address.city,
+      "dentro_sao_paulo":inside,"aviso":None if inside else OUT_OF_CITY_MESSAGE,
+      "latitude":address.latitude,"longitude":address.longitude,"nota_localizacao":APPROXIMATE_LOCATION_NOTICE}
 
 @app.get("/api/categories")
 def categories(): return [{"value":k,"label":v} for k,v in CATEGORIES.items()]
