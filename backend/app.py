@@ -2,9 +2,10 @@ import os
 from datetime import date
 from pathlib import Path
 import psycopg
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from psycopg.rows import dict_row
+from geohabita.application.rate_limit import RateLimiter
 from geohabita.application.cep_lookup import CepLookup,CepNotFoundError,ProviderError
 from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE,OUT_OF_CITY_MESSAGE,is_sao_paulo
@@ -22,6 +23,17 @@ DB_URL=os.getenv("DATABASE_URL","postgresql://postgres@localhost:5432/ProjetoInt
 MUNICIPIOS_SP=["S.PAULO","SAO PAULO","SÃO PAULO"]
 CATEGORIES={"objetos":"Objetos","celulares_subtraidos":"Celulares subtraídos","apreensao_entorpecente":"Apreensão de entorpecentes","entorpecentes_gramas":"Entorpecentes (gramas)","outros":"Outros"}
 app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1.0.0",description="Resumos agregados por período, categoria e localização.")
+
+rate_limiter=RateLimiter()
+
+@app.middleware("http")
+async def limit_api_requests(request:Request,call_next):
+    # RNF08: 60 requisições por minuto por IP nas rotas públicas da API.
+    # Atrás de um proxy reverso, o IP do cliente deve vir do próprio proxy.
+    client=request.client.host if request.client else "desconhecido"
+    if request.url.path.startswith("/api/") and not rate_limiter.allow(client):
+        return JSONResponse({"detail":"Muitas requisições. Aguarde um minuto e tente novamente."},status_code=429,headers={"Retry-After":"60"})
+    return await call_next(request)
 
 def connect():
     try: return psycopg.connect(DB_URL,connect_timeout=5,row_factory=dict_row)
