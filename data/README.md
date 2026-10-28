@@ -25,7 +25,7 @@ Baixe os CSVs dos períodos disponíveis e salve-os com os nomes originais na pa
 | `spDados/DadosProdutividade_{ano}.xlsx` | presos, veículos recuperados, armas, entorpecentes, flagrantes, ECA, prisões (uma aba cada) | `presos_apreendidos`, `veiculos_recuperados`, `armas_apreendidas`, `entorpecentes_gramas`, `apreensao_entorpecente`, `flagrantes`, `apreensao_eca`, `prisoes` |
 | `spDados/MDIP_{ano}.xlsx` | mortes decorrentes de intervenção policial, 2013 até hoje em um só arquivo (o nome leva o ano corrente) | `mdip` |
 
-O `manifesto.json` guarda `Last-Modified` e tamanho de cada fonte; uma nova execução só baixa e reconverte o que a SSP atualizou (normalmente o ano corrente). Os arquivos grandes passam de 400 MB e a conversão leva vários minutos. Para atualizar periodicamente, agende o pipeline, por exemplo semanalmente: `0 3 * * 1 cd /caminho/do/projeto && uv run --env-file .env scripts/pipeline_dados.py --etapas ssp-baixar ssp-carregar resumo`.
+Cada XLSX é apagado assim que é convertido em CSV, o que reduz o pico de disco (o CSV ocupa cerca do dobro do XLSX). O `manifesto.json` guarda `Last-Modified` e tamanho de cada fonte; uma nova execução só baixa e reconverte o que a SSP atualizou (normalmente o ano corrente). Os arquivos grandes passam de 400 MB e a conversão leva vários minutos. Para atualizar periodicamente, agende o pipeline, por exemplo semanalmente: `0 3 * * 1 cd /caminho/do/projeto && uv run --env-file .env scripts/pipeline_dados.py --etapas ssp-baixar ssp-carregar resumo`.
 
 Cuidados com os dados:
 
