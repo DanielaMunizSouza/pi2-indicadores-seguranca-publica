@@ -76,3 +76,18 @@ def viacep(cep: str, timeout: float) -> Address | None:
 
 def brasilapi(cep: str, timeout: float) -> Address | None:
     return parse_brasilapi(_get_json(BRASILAPI_URL.format(cep=cep), timeout))
+
+
+def brasilapi_coordinates(cep: str, timeout: float = 3.0) -> tuple[float, float] | None:
+    """Coordenadas do CEP pela BrasilAPI, ou ``None`` se ela não as tiver ou falhar.
+
+    Serve de geocodificador no diagnóstico: o ViaCEP, serviço principal, não
+    devolve coordenadas.
+    """
+    try:
+        address = brasilapi(cep, timeout)
+    except ProviderError:
+        return None
+    if address is None or address.latitude is None or address.longitude is None:
+        return None
+    return address.latitude, address.longitude
