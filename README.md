@@ -41,3 +41,18 @@ O importador reprocessa cada arquivo em transação, sem alterar os originais, e
 ## Interpretação
 
 As contagens são linhas de planilhas policiais; um boletim pode ter mais de uma linha. Nem todos os registros têm CEP ou coordenadas. O mapa atribui pontos georreferenciados aos distritos pelo PostGIS; os registros sem coordenada permanecem nos indicadores gerais, mas não podem ser contados por área. As cores são faixas relativas entre distritos para os filtros escolhidos, não taxas populacionais. Ao filtrar por CEP, os registros georreferenciados são reunidos em um único distrito: o de maior concentração histórica de coordenadas daquele CEP, para evitar que coordenadas divergentes destaquem várias áreas. O resumo mantém o total de registros do CEP. Os distritos são limites administrativos oficiais, não polígonos de CEP ou bairros. A geometria de referência está em `data/reference/distritos_sp.geojson` e sua origem/licença estão documentadas em `data/reference/README.md`.
+
+## Licença
+
+Este repositório usa duas licenças, conforme o tipo de conteúdo:
+
+| Conteúdo | Licença |
+|---|---|
+| Código-fonte e software (tudo fora dos diretórios do relatório) | [GNU AGPL-3.0](LICENSE) |
+| Relatório acadêmico: diretórios `relatorio/` e `relatorio_parcial/` (fontes LaTeX, bibliografia, figuras, fontes dos diagramas e PDFs gerados) | [CC BY-ND 4.0](https://creativecommons.org/licenses/by-nd/4.0/deed.pt-br) |
+
+**Código (AGPL-3.0):** o software é livre para uso, estudo, modificação e redistribuição nos termos do arquivo `LICENSE`. Quem disponibilizar uma versão modificada para uso por rede deve oferecer o código-fonte correspondente aos usuários.
+
+**Relatório (CC BY-ND 4.0):** o relatório pode ser copiado e redistribuído livremente, em qualquer meio ou formato, inclusive para fins comerciais, desde que integralmente, sem alterações e com a atribuição aos autores. Não é permitido distribuir versões modificadas ou obras derivadas do texto. O conteúdo é definido exclusivamente pelos autores, que são as pessoas identificadas como autoras no arquivo `.tex` principal e no PDF final do relatório, incluindo quem vier a ser acrescentado nessas listas. Citações com a devida referência continuam permitidas nos termos do art. 46 da Lei nº 9.610/1998. Detalhes em `relatorio/LICENSE.md`.
+
+**Exceções:** materiais de terceiros mantêm as licenças originais, por exemplo a classe abnTeX2 (`abntex2_ref.cls`, LPPL 1.3c), o texto da AGPL (`AGPL.tex`, © Free Software Foundation) e os dados de `data/reference/` (ver `data/reference/README.md`).
