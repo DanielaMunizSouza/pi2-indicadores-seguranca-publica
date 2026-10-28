@@ -1,0 +1,816 @@
+\documentclass[
+    12pt,
+    oneside,            % 1. REMOVE PÁGINAS EM BRANCO (substitui twoside e ignora openright)
+    a4paper,
+    brazilian
+    ]{abntex2}
+
+
+% ---
+% PACOTES
+% ---
+
+% ---
+% Pacotes fundamentais
+% ---
+% \usepackage{lmodern}% Usa a fonte Latin Modern
+%\usepackage{mathptmx}
+\usepackage[T1]{fontenc}		% Selecao de codigos de fonte.
+% \usepackage{mathptmx}
+\usepackage[utf8]{inputenc}		% Codificacao do documento (conversão automática dos acentos)
+\usepackage{mathptmx}
+% \usepackage{fancyhdr}
+
+% \fontfamily{ptm}\selectfont
+
+\usepackage{indentfirst}		% Indenta o primeiro parágrafo de cada seção.
+\usepackage{color}				% Controle das cores
+\usepackage{graphicx}			% Inclusão de gráficos
+\usepackage{microtype} 			% para melhorias de justificação
+\usepackage{pdfpages}
+% ---
+
+% ---
+% Pacotes adicionais, usados no anexo do modelo de folha de identificação
+% ---
+\usepackage{multicol}
+\usepackage{multirow}
+% ---
+
+% ---
+% Pacotes adicionais, usados apenas no âmbito do Modelo Canônico do abnteX2
+% ---
+\usepackage{lipsum}				% para geração de dummy text
+% ---
+
+% ---
+% Pacotes necessários para o apêndice de requisitos (quadros e equações)
+% ---
+\usepackage{amsmath}				% equações com \dfrac, \text e cases
+\usepackage{longtable}				% quadros longos que quebram entre páginas
+\usepackage{xurl}					% permite quebrar URLs longas em qualquer ponto
+\usepackage[htt]{hyphenat}		% permite hifenizar nomes de entidades em \texttt
+% ---
+
+% ---
+% Imagens ainda não geradas
+% ---
+% \imgura[altura]{largura}{arquivo}: se o arquivo já existir, inclui a imagem
+% com a largura informada; caso contrário, desenha uma moldura com o nome do
+% arquivo, para que o texto compile enquanto o artefato não é produzido. Ao
+% criar o arquivo em img/, a imagem passa a aparecer automaticamente.
+% \detokenize protege o "_" do nome do arquivo, que o LaTeX leria como subscrito.
+\newcommand{\imgura}[3][5cm]{%
+	\IfFileExists{#3}{%
+		\includegraphics[width=#2]{#3}%
+	}{%
+		\begingroup
+		\setlength{\fboxsep}{0pt}%
+		\fbox{%
+			\parbox[c][#1][c]{\dimexpr#2-2\fboxrule\relax}{%
+				\centering\footnotesize\texttt{\detokenize{#3}}%
+			}%
+		}%
+		\endgroup
+	}%
+}
+\addto\captionsbrazilian{\renewcommand{\fontename}{Fonte}}
+\renewcommand{\fontename}{Fonte}
+% ---
+
+% ---
+% Pacotes de citações
+% ---
+\usepackage[brazilian,hyperpageref]{backref}	 % Paginas com as citações na bibl
+\usepackage[alf]{abntex2cite}	% Citações padrão ABNT
+
+% ---
+% CONFIGURAÇÕES DE PACOTES
+% ---
+% ---
+% TAMANHO NORMAL PARA TÍTULOS DE APÊNDICES E ANEXOS
+% ---
+\makeatletter
+% Garante que a fonte de capítulos (usada por apêndices) seja normal
+\renewcommand{\ABNTEXchapterfontsize}{\normalsize}
+\makeatother
+% ---
+% Configurações do pacote backref
+% Usado sem a opção hyperpageref de backref
+\renewcommand{\backrefpagesname}{Citado na(s) página(s):~}
+% Texto padrão antes do número das páginas
+\renewcommand{\backref}{}
+% Define os textos da citação
+\renewcommand*{\backrefalt}[4]{
+	\ifcase #1 %
+		Nenhuma citação no texto.%
+	\or
+		Citado na página #2.%
+	\else
+		Citado #1 vezes nas páginas #2.%
+	\fi}%
+% ---
+\renewcommand{\ABNTEXchapterfont}{\fontfamily{ptm}\fontseries{b}\selectfont}
+\renewcommand{\imprimircapa}{%
+\begin{capa}%
+\center
+\ABNTEXchapterfont \large \bfseries \MakeUppercase{\imprimirinstituicao}
+
+\vspace*{\fill/2}
+{\ABNTEXchapterfont \normalfont \large \imprimirautor}
+\vspace*{\fill/2}
+\begin{center}
+\ABNTEXchapterfont\bfseries\large\imprimirtitulo
+\end{center}
+\vfill
+
+\large\normalfont\imprimirlocal
+
+\large\imprimirdata
+\vspace*{1cm}
+\end{capa}
+}
+\renewcommand{\folhaderostocontent}{\begin{center}
+    \center
+    \ABNTEXchapterfont \large \bfseries \MakeUppercase{\imprimirinstituicao}
+
+    \vspace*{\fill}\vspace*{\fill}
+    \begin{center}
+      \ABNTEXchapterfont\bfseries\large\imprimirtitulo
+    \end{center}
+    \vspace*{\fill/2}
+
+
+      \normalfont\normalsize
+      \hspace{.45\textwidth}
+      \begin{minipage}{.5\textwidth}
+      	\SingleSpacing
+         \imprimirpreambulo
+       \end{minipage}%
+       \vspace*{\fill} \vspace*{\fill}
+
+
+
+    {\large\imprimirlocal}
+    \par
+    {\large\imprimirdata}
+    \vspace*{1cm}
+
+  \end{center}
+}
+% ---
+% ALTERAR TAMANHO DA FONTE DAS SEÇÕES
+% ---
+\renewcommand{\ABNTEXsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsectionfont}{\normalfont\normalsize}
+% ---
+% Informações de dados para CAPA e FOLHA DE ROSTO
+% ---
+\titulo{Sistema Web de Análise de Segurança Territorial por Meio de Dados Públicos}
+\autor{\texorpdfstring{Daniela Muniz de Souza, 23215770 \\ Pedro Henrique Felix Gomes, 24217853}{Daniela Muniz de Souza; Pedro Henrique Felix Gomes}}
+\local{São Paulo - SP}
+\data{2026}
+\instituicao{%
+  Universidade Virtual do Estado de São Paulo
+  }
+\tipotrabalho{Relatório técnico}
+% O preambulo deve conter o tipo do trabalho, o objetivo,
+% o nome da instituição e a área de concentração
+\preambulo{Relatório Técnico-Científico apresentado na disciplina de Projeto Integrador para o curso de Bacharel em Tecnologia da Informação da Universidade Virtual do Estado de São Paulo (UNIVESP).}
+% ---
+
+% ---
+% Configurações de aparência do PDF final
+
+% alterando o aspecto da cor azul
+\definecolor{blue}{RGB}{41,5,195}
+
+% informações do PDF
+\makeatletter
+\hypersetup{
+     	%pagebackref=true,
+		pdftitle={\@title},
+		pdfauthor={\@author},
+    	pdfsubject={\imprimirpreambulo},
+	    pdfcreator={LaTeX with abnTeX},
+		pdfkeywords={abnt}{latex}{abntex}{abntex2}{relatório técnico},
+		colorlinks=true,       		% false: boxed links; true: colored links
+    	linkcolor=black,          	% color of internal links
+    	citecolor=black,        		% color of links to bibliography
+    	filecolor=magenta,      		% color of file links
+		urlcolor=black,
+		bookmarksdepth=4
+}
+\makeatother
+% ---
+
+% ---
+% Espaçamentos entre linhas e parágrafos
+% ---
+
+% O tamanho do parágrafo é dado por:
+\setlength{\parindent}{1.3cm}
+
+% Controle do espaçamento entre um parágrafo e outro:
+\setlength{\parskip}{0.2cm}  % tente também \onelineskip
+
+% ---
+% compila o indice
+% ---
+\makeindex
+% ---
+\usepackage{chngcntr}
+\counterwithout{section}{chapter}
+\renewcommand{\thesection}{\arabic{section}}
+% ---
+% REMOVER LINHA E TEXTO DO CABEÇALHO (Padrão ABNT)
+% ---
+
+% ----
+% Início do documento
+% ----
+\begin{document}
+
+% Seleciona o idioma do documento (conforme pacotes do babel)
+%\selectlanguage{english}
+\selectlanguage{brazilian}
+
+% Retira espaço extra obsoleto entre as frases.
+\frenchspacing
+
+% ----------------------------------------------------------
+% ELEMENTOS PRÉ-TEXTUAIS
+% ----------------------------------------------------------
+% \pretextual
+
+% ---
+% Capa
+% ---
+\imprimircapa
+% ---
+% ---
+% Folha de rosto
+% (o * indica que haverá a ficha bibliográfica)
+% ---
+\imprimirfolhaderosto*
+% ---
+% ---
+% Anverso da folha de rosto:
+% ---
+
+% {
+% \ABNTEXchapterfont
+
+% \vspace*{\fill}
+
+% Conforme a ABNT NBR 10719:2015, seção 4.2.1.1.1, o anverso da folha de rosto
+% deve conter:
+
+% \begin{alineas}
+%   \item nome do órgão ou entidade responsável que solicitou ou gerou o
+%    relatório;
+%   \item título do projeto, programa ou plano que o relatório está relacionado;
+%   \item título do relatório;
+%   \item subtítulo, se houver, deve ser precedido de dois pontos, evidenciando a
+%    sua subordinação ao título. O relatório em vários volumes deve ter um título
+%    geral. Além deste, cada volume pode ter um título específico;
+%   \item número do volume, se houver mais de um, deve constar em cada folha de
+%    rosto a especificação do respectivo volume, em algarismo arábico;
+%   \item código de identificação, se houver, recomenda-se que seja formado
+%    pela sigla da instituição, indicação da categoria do relatório, data,
+%    indicação do assunto e número sequencial do relatório na série;
+%   \item classificação de segurança. Todos os órgãos, privados ou públicos, que
+%    desenvolvam pesquisa de interesse nacional de conteúdo sigiloso, devem
+%     informar a classificação adequada, conforme a legislação em vigor;
+%   \item nome do autor ou autor-entidade. O título e a qualificação ou a função
+%    do autor podem ser incluídos, pois servem para indicar sua autoridade no
+%    assunto. Caso a instituição que solicitou o relatório seja a mesma que o
+%    gerou, suprime-se o nome da instituição no campo de autoria;
+%   \item local (cidade) da instituição responsável e/ou solicitante; NOTA: No
+%    caso de cidades homônimas, recomenda-se o acréscimo da sigla da unidade da
+%    federação.
+%   \item ano de publicação, de acordo com o calendário universal (gregoriano),
+%   deve ser apresentado em algarismos arábicos.
+% \end{alineas}
+
+% \vspace*{\fill}
+% }
+
+% % ---
+% % Agradecimentos
+% % ---
+% \begin{agradecimentos}
+% O agradecimento principal é direcionado a Youssef Cherem, autor do
+% \nameref{formulado-identificacao} (\autopageref{formulado-identificacao}).
+
+% Os agradecimentos especiais são direcionados ao Centro de Pesquisa em
+% Arquitetura da Informação\footnote{\url{http://www.cpai.unb.br/}} da Universidade de
+% Brasília (CPAI), ao grupo de usuários
+% \emph{latex-br}\footnote{\url{http://groups.google.com/group/latex-br}} e aos
+% novos voluntários do grupo
+% \emph{\abnTeX}\footnote{\url{http://groups.google.com/group/abntex2} e
+% \url{http://www.abntex.net.br/}}~que contribuíram e que ainda
+% contribuirão para a evolução do abn\TeX.
+
+% \end{agradecimentos}
+% ---
+
+% ---
+% RESUMO
+% ---
+
+\noindent
+SOUZA, D. M.; GOMES, P. H. F. \textbf{\imprimirtitulo{}}. Relatório Técnico-Científico. Bacharel em Tecnologia da Informação, \textbf{Universidade Virtual do Estado de São Paulo.} Tutor: Maycol Clister Fernández Chillcce. Polo Butantã, CEU Azul da Cor do Mar, 2026.
+\vspace*{2.5cm}
+
+\noindent
+\textbf{RESUMO}
+
+\vspace{0.6cm}
+
+
+{\linespread{1.0}\selectfont \noindent
+O presente trabalho visa contribuir com dados para a tomada de decisões complexas aos cidadãos da cidade de São Paulo, marcadas pela assimetria informativa e pela instrumentalização do medo da violência urbana. Embora dados públicos relevantes estejam formalmente disponíveis em repositórios abertos, como o portal GeoSampa e os relatórios estatísticos da Secretaria da Segurança Pública (SSP-SP), tais informações encontram-se dispersas em formatos técnicos e de baixa usabilidade, inviabilizando a capacidade de inferência dos usuários. O objetivo é desenvolver uma plataforma web cívica e acessível voltada a munícipes, que integra indicadores oficiais de segurança pública à oferta de infraestrutura urbana essencial (saúde, transporte coletivo, áreas verdes e educação) mediante a consulta simplificada por Código de Endereçamento Postal (CEP). Neste trabalho adota-se a abordagem de Design Thinking, organizada nas etapas de escuta do contexto, criação e prototipagem, e implementação e teste, associada a práticas de engenharia de software e métodos ágeis inspirados no Scrum. A escuta presencial realizada com dez moradores confirmou o desconhecimento generalizado acerca das bases estatais e orientou a especificação de um Produto Mínimo Viável (MVP) com 25 requisitos funcionais (14 essenciais), 18 requisitos não funcionais e 16 regras de negócio, estruturado em arquitetura em camadas desacopladas com retaguarda em Python, banco de dados relacional PostgreSQL/PostGIS, cliente web acessível em conformidade com as diretrizes WCAG 2.1 e WAI-ARIA, e plano de testes automatizados. Os resultados parciais incluem o diagnóstico empírico, a especificação técnica detalhada, os diagramas de casos de uso, arquitetura e entidade-relacionamento, além de wireframes conceituais e do cronograma incremental em sprints para a codificação e validação com a comunidade.
+	\par}
+
+
+\vspace{2cm}
+\noindent
+\MakeUppercase{\textbf{Palavras-chaves:}} diagnóstico socioespacial; segurança pública; dados abertos; tecnologia cívica; acessibilidade web; engenharia de software.
+% ---
+\newpage
+% ---
+% inserir lista de ilustrações
+% ---
+\pdfbookmark[0]{\listfigurename}{lof}
+\listoffigures*
+\cleardoublepage
+% ---
+
+% ---
+% inserir lista de tabelas
+% ---
+% \pdfbookmark[0]{\listtablename}{lot}
+% \listoftables*
+% \cleardoublepage
+% ---
+
+% ---
+% inserir lista de abreviaturas e siglas
+% ---
+\begin{siglas}
+  \item[ABNT] Associação Brasileira de Normas Técnicas
+  \item[AGPL] \textit{Affero General Public License}
+  \item[AJAX] \textit{Asynchronous JavaScript and XML}
+  \item[API] \textit{Application Programming Interface} (Interface de Programação de Aplicação)
+  \item[CEP] Código de Endereçamento Postal
+  \item[CEU] Centro Educacional Unificado
+  \item[CSV] \textit{Comma-Separated Values}
+  \item[DOM] \textit{Document Object Model}
+  \item[DP] Distrito Policial
+  \item[e-MAG] Modelo de Acessibilidade em Governo Eletrônico
+  \item[ETL] \textit{Extract, Transform, Load} (Extração, Transformação e Carga)
+  \item[GNU] \textit{GNU's Not Unix}
+  \item[HTTPS] \textit{Hypertext Transfer Protocol Secure}
+  \item[IBGE] Instituto Brasileiro de Geografia e Estatística
+  \item[IPL] Índice de Proximidade Local
+  \item[IVEP] Índice de Vitalidade do Espaço Público
+  \item[JSON] \textit{JavaScript Object Notation}
+  \item[LAI] Lei de Acesso à Informação
+  \item[LGPD] Lei Geral de Proteção de Dados Pessoais
+  \item[MoSCoW] \textit{Must, Should, Could, Won't}
+  \item[MVP] Produto Mínimo Viável (\textit{Minimum Viable Product})
+  \item[ODbL] \textit{Open Database License}
+  \item[OWASP] \textit{Open Web Application Security Project}
+  \item[PMSP] Prefeitura do Município de São Paulo
+  \item[REST] \textit{Representational State Transfer}
+  \item[RIA] Aplicações Ricas de Internet (\textit{Rich Internet Applications})
+  \item[SIRGAS] Sistema de Referência Geocêntrico para as Américas
+  \item[SQL] \textit{Structured Query Language}
+  \item[SSP-SP] Secretaria da Segurança Pública do Estado de São Paulo
+  \item[SUS] \textit{System Usability Scale}
+  \item[UBS] Unidade Básica de Saúde
+  \item[UNIVESP] Universidade Virtual do Estado de São Paulo
+  \item[UTM] \textit{Universal Transverse Mercator} (Universal Transversa de Mercator)
+  \item[UX] \textit{User Experience} (Experiência do Usuário)
+  \item[WAI-ARIA] \textit{Web Accessibility Initiative - Accessible Rich Internet Applications}
+  \item[WCAG] \textit{Web Content Accessibility Guidelines}
+  \item[WFS] \textit{Web Feature Service}
+  \item[ZAP] \textit{Zed Attack Proxy}
+\end{siglas}
+% ---
+
+% ---
+% inserir lista de símbolos
+% ---
+% \begin{simbolos}
+%   \item[$ \Gamma $] Letra grega Gama
+%   \item[$ \Lambda $] Lambda
+%   \item[$ \zeta $] Letra grega minúscula zeta
+%   \item[$ \in $] Pertence
+% \end{simbolos}
+% ---
+
+% ---
+% inserir o sumario
+% ---
+\pdfbookmark[0]{\contentsname}{toc}
+\tableofcontents*
+\cleardoublepage
+% ---
+
+
+% ----------------------------------------------------------
+% ELEMENTOS TEXTUAIS
+% ----------------------------------------------------------
+\textual
+
+% ----------------------------------------------------------
+% Introdução (exemplo de capítulo sem numeração, mas presente no Sumário)
+% ----------------------------------------------------------
+% ---
+% REMOVER LINHA E TEXTO DO CABEÇALHO (Padrão ABNT)
+% ---
+\makepagestyle{abntclean}
+\makeevenhead{abntclean}{\thepage}{}{}
+\makeoddhead{abntclean}{}{}{\thepage}
+\makeevenfoot{abntclean}{}{}{}
+\makeoddfoot{abntclean}{}{}{}
+
+\pagestyle{abntclean}
+
+\section{Introdução}
+
+A busca por moradia na cidade de São Paulo impõe às famílias e cidadãos um processo decisório complexo, marcado por profundas assimetrias na distribuição de infraestrutura urbana, serviços públicos e equipamentos essenciais \cite{caldeira2000}. Dentre as variáveis a serem ponderadas na escolha de um novo lar, uma que ressalta particularmente para a comunidade escolhida como foco deste projeto integrador é a preocupação com a segurança e a habitabilidade das futuras vizinhanças de pessoas em transição habitacional na capital paulista.
+
+A dinâmica metropolitana revela que a proliferação da violência e a instrumentalização do medo transformaram profundamente os modos de habitar, impulsionando a formação de enclaves fortificados e a privatização da vigilância, o que fragmenta o tecido público e reforça a segregação socioespacial, conforme criticado por \citeonline{caldeira2000}
+
+No âmbito da economia urbana, a criminalidade é frequentemente tratada como uma desamenidade hedônica que deprecia o valor do solo \cite{teixeira2016}\footnotemark. No entanto, converter a segurança em um indicador isolado ou em mapas alarmistas tende a agravar preconceitos territoriais contra bairros populares e alimentar a especulação imobiliária, ignorando que crimes patrimoniais de rua frequentemente se concentram em áreas de alta renda e fluxo comercial, enquanto a segurança real depende da vitalidade comunitária, dos ``olhos na rua'' e da presença de infraestrutura urbana acolhedora \cite{jacobs2011,nev2024}.
+
+Em meio a esse cenário, os cidadãos enfrentam uma assimetria informativa acentuada: por um lado, plataformas imobiliárias convencionais utilizam o discurso da segurança privada para supervalorizar condomínios murados e omitem carências do entorno; por outro, dados públicos relevantes como as estatísticas da Secretaria da Segurança Pública (SSP-SP) e as camadas de saúde, áreas verdes e transporte mantidas pelo portal GeoSampa permanecem fragmentados em painéis administrativos e formatos especializados, inacessíveis à população sem domínio de ferramentas de geoprocessamento \cite{ssp2024,geosampa2024,cem2021}.
+
+Diante desse contexto, o tema norteador do projeto integrador: ``Desenvolvimento de um software com framework web que utilize noções de banco de dados, script web (Javascript), nuvem, uso de API, acessibilidade, controle de versão e testes'', foi aplicada da metodologia do \emph{Design Thinking} (nas etapas de ouvir, criar e implementar) junto a cidadãos que vivenciam a busca por habitação. Foi concebido um modelo de solução centrado na transparência cívica e no direito à cidade, uma ferramenta capaz de converter o endereço pretendido, consultado de forma simplificada por Código de Endereçamento Postal (CEP), em uma avaliação equilibrada do território, contextualizando indicadores de segurança com a proximidade a serviços essenciais (unidades de saúde, praças, parques e transporte público coletivo), desmistificando estigmas e fortalecendo o poder de escolha do morador.
+
+A solução almejada, nomeada \textbf{GeoHabita: Diagnóstico Socioespacial Integrado}, tem como objetivo democratizar o acesso a informações urbanas qualificadas, servindo como instrumento de apoio à decisão habitacional e de cidadania. Do ponto de vista técnico, este trabalho busca construir um Produto Mínimo Viável (em inglês \emph{MVP}) estruturado em arquitetura web em camadas, utilizando JavaScript/TypeScript, banco de dados com suporte a consultas geoespaciais, microsserviços integradores de APIs abertas (ViaCEP, BrasilAPI e servidores WFS do município), infraestrutura em nuvem e conformidade primária com os padrões e diretrizes de acessibilidade para Aplicações Ricas de Internet (RIAs) analisados por \citeonline{padroesAcessibilidade2019}. Adotam-se, assim, as recomendações da WCAG 2.1 e a especificação WAI-ARIA, com destaque para \emph{roles}, estados, propriedades e regiões vivas (\emph{live regions}), garantindo que o dinamismo assíncrono das consultas e a apresentação dos dados cartográficos disponham de equivalência textual plena para sintetizadores de voz e leitores de tela.
+
+Foram, contudo, excluídas do escopo inicial rotinas de extração automatizada não estruturada (\emph{Web Scraping}) e modelagens preditivas complexas de inteligência artificial, priorizando-se a integridade das consultas espaciais, a usabilidade universal e o prazo da disciplina. Todo o projeto será desenvolvido sob controle de versão contínuo e distribuído sob a licença GNU AGPL v3 \cite{agplv3}.
+
+\footnotetext{
+	A Teoria dos Preços Hedônicos decompõe o valor de um bem habitacional em uma cesta de atributos construtivos e amenidades/desamenidades locacionais.
+	No contexto técnico nacional, a modelagem de atributos por regressão para avaliação de imóveis urbanos é padronizada pelos procedimentos de inferência estatística da norma ABNT NBR 14.653-2 \cite{abnt2011}.
+}
+
+\section{Desenvolvimento}
+
+\hfill
+
+\subsection{Objetivos}
+
+Desenvolver uma plataforma web acessível e cidadã para a realização de um diagnóstico socioespacial integrado na cidade de São Paulo, articulando dados oficiais de segurança pública à disponibilidade de infraestrutura urbana essencial (como transporte público, unidades de saúde e áreas verdes).
+
+Identificar o medo da violência urbana, e quais elementos os moradores entendem como prioritários e essenciais para a habitabilidade de suas vizinhanças (tais como caminhabilidade, iluminação e transporte seguro).
+
+Busca-se caracterizar as bases de dados oficiais da Secretaria da Segurança Pública (SSP-SP) e do portal GeoSampa, analisando suas limitações de agregação por distrito policial e os desafios de harmonização espacial via código postal (CEP).
+
+Pretende-se definir por meio de técnicas de engenharia de software ágil, documentar os requisitos funcionais, não funcionais e casos de uso, construindo uma especificação técnica robusta que incorpore os padrões de acessibilidade para aplicações ricas (RIAs).
+
+Desta forma, construir, com controle de versão, rotinas de testes e banco de dados relacional com extensão geoespacial, uma plataforma web acessível, resiliente e razoavelmente escalável que possa mitigar a opacidade mercadológica e a fragmentação dos dados públicos observadas na tomada de decisão de moradia.
+
+\hfill
+
+\subsection{Justificativa e delimitação do problema}
+
+À luz dos dilemas de segurança e habitabilidade apontados pelos cidadãos como pontos de maior aflição no processo de busca por moradia, e diante da constatação de que as informações públicas existentes não alcançam quem delas mais necessita, elaborou-se a seguinte pergunta norteadora: Como podemos integrar, simplificar e democratizar o acesso a dados abertos de segurança pública e infraestrutura urbana para apoiar a decisão de moradia na cidade de São Paulo, superando a ineficácia da transparência governamental e a assimetria do mercado imobiliário?
+
+Como destaca \citeonline{caldeira2000}, a proliferação da violência e a instrumentalização da ``fala do crime'' na capital paulista impulsionaram historicamente a multiplicação de enclaves fortificados e a privatização da vigilância, fragmentando o tecido público e aprofundando a segregação socioespacial. Embora a criminalidade atue como desamenidade direta sobre os valores habitacionais sob a ótica da economia urbana \cite{teixeira2016}, o mercado imobiliário frequentemente apropria-se do medo para justificar a supervalorização de condomínios murados e a depreciação de bairros populares consolidados, desconsiderando que a segurança real decorre da vitalidade comunitária, dos ``olhos na rua'' e da presença de serviços e infraestrutura pública acolhedora \cite[cap.~1]{jacobs2011}.
+
+Sem alternativas transparentes de consulta, as famílias permanecem vulneráveis ao discurso comercial das incorporadoras e ao sensacionalismo da mídia, perpetuando decisões de moradia desinformadas e estigmas territoriais prejudiciais à cidade \cite{nev2024}.
+
+Durante a etapa de imersão do \emph{Design Thinking}, as entrevistas conduzidas com pessoas que buscam moradia na capital evidenciaram de forma contundente essa assimetria: nenhum dos entrevistados tinha conhecimento prévio da existência do portal GeoSampa ou dos boletins estatísticos periódicos da Secretaria da Segurança Pública (SSP-SP) \cite{ssp2024,geosampa2024}. Ao serem expressamente indagados pelo grupo se sabiam que poderiam checar os índices criminais e a distribuição de equipamentos públicos de suas futuras vizinhanças por meio de dados abertos do governo, a resposta foi unanimemente negativa. Tal constatação desvela a ineficácia da transparência pública estritamente formal, que disponibiliza microdados brutos em formatos burocráticos e painéis especializados, mas falha em convertê-los em transparência real para o cidadão comum.
+
+Convém destacar que os dados provenientes dos munícipes ouvidos passaram por processo de \textbf{pseudonimização} neste relatório, prerrogativa fundamentada pelo caráter sensível dos relatos, que incluíam expor rotinas de deslocamento, receios de vitimização e preocupações efetivas acerca da segurança patrimonial e familiar. Os canais de contato disponibilizados foram mantidos em base segregada e sob confidencialidade rigorosa por parte da equipe responsável pelo desenvolvimento, em consonância com as diretrizes de consentimento estabelecidas pela LGPD, visando exclusivamente possibilitar o recontato com os participantes nas fases subsequentes de validação dos wireframes e do MVP.
+
+O projeto, portanto, se propõe a atuar justamente nessa lacuna entre a disponibilidade do dado bruto e a sua utilidade social, fornecendo uma ferramenta web pública e acessível de diagnóstico socioespacial capaz de traduzir indicadores de segurança e infraestrutura em avaliações compreensíveis por meio da simples consulta por CEP, especificamente no contexto territorial da cidade de São Paulo.
+
+\hfill
+
+\subsection{Fundamentação Teórica}
+Este trabalho sustenta-se em três pilares principais complementares: a dinâmica socioespacial urbana e os determinantes de segurança e habitabilidade na escolha residencial; a transparência da gestão pública, dados abertos e acessibilidade digital; e, por fim, a engenharia de software (métodos ágeis, arquitetura web em camadas, banco de dados com suporte geoespacial, controle de versão e garantia de qualidade). Sob estes prismas, compreende-se em profundidade o problema diagnosticado e motivador do projeto, a opacidade informativa do mercado imobiliário e a ineficácia prática da transparência governamental acerca da segurança e da infraestrutura pública em São Paulo, a estrutura conceitual da solução proposta, assim como as escolhas para o seu desenvolvimento, tanto do ponto de vista da \emph{stack} tecnológica e da modelagem espacial quanto das estratégias de teste e acessibilidade universal.
+
+\subsubsection{Dinâmica socioespacial, a retórica do medo e a vitalidade urbana na escolha habitacional}
+A conformação do tecido urbano na cidade de São Paulo é historicamente marcada por profundas desigualdades na oferta de equipamentos públicos e por padrões persistentes de segregação socioespacial. Como analisa criticamente \citeonline{caldeira2000}, a partir das últimas décadas do século XX, a disseminação da violência e a instrumentalização generalizada da ``fala do crime'' alteraram estruturalmente o padrão de urbanização da metrópole, impulsionando a privatização da segurança cotidiana e a proliferação dos chamados enclaves fortificados. A autora sintetiza o impacto dessa transformação na morfologia urbana e na convivência democrática:
+
+\begin{citacao}
+	Os condomínios fechados são a versão residencial de uma categoria mais ampla
+	de novos empreendimentos urbanos que chamo de enclaves fortificados. Eles estão
+	mudando consideravelmente a maneira como as pessoas das classes média e alta
+	vivem, consomem, trabalham e gastam seu tempo de lazer. Eles estão mudando o
+	panorama da cidade, seu padrão de segregação espacial e o caráter do espaço público
+	e das interações públicas entre as classes. Os enclaves fortificados incluema
+	conjuntos de escritórios, shopping centers, e cada vez mais outros espaços que têm
+	sido adaptados para se conformarem a esse modelo, como escolas, hospitais, centros
+	de lazer e parques temáticos. Todos os tipos de enclaves fortificados partilham
+	algumas características básicas. São propriedade privada para uso coletivo e enfatizam
+	o valor do que é privado e restrito ao mesmo tempo que desvalorizam o
+	que é público e aberto na cidade. São fisicamente demarcados e isolados por muros,
+	grades, espaços vazios e detalhes arquitetônicos. São voltados para o interior e
+	não em direção à rua, cuja vida pública rejeitam explicitamente. São controlados
+	por guardas armados e sistemas de segurança, que impõem as regras de inclusão e
+	exclusão.[...] % São flexíveis: devido ao seu tamanho, às novas tecnologias de comunicação,
+	% organização do trabalho e aos sistemas de segurança, eles são espaços autônomos,
+	% independentes do seu entorno, que podem ser situados praticamente em
+	% qualquer lugar. Em outras palavras, em contraste com formas anteriores de empreendimentos
+	% comerciais e residenciais, eles pertencem não ao seus arredores imediatos,
+	% mas a redes invisíveis (Cenzatti e Crawford 1998).! Em consequência, embora tendam
+	% a ser espaços para as classes altas, podem ser situados em áreas rurais ou na
+	% periferia, ao lado de favelas ou casas autoconstruídas. Finalmente, os enclaves tendem
+	% a ser ambientes socialmente homogêneos. Aqueles que escolhem habitar esses
+	% espaços valorizam viver entre pessoas seletas (ou seja, do mesmo grupo social) e
+	% longe das interações indesejadas, movimento, heterogeneidade, perigo e imprevisibilidade
+	% das ruas. Os enclaves privados e fortificados cultivam um relacionamento
+	% de negação e ruptura com o resto da cidade e com o que pode ser chamado de
+	% um estilo moderno de espaço público aberto à livre circulação. Eles estão transformando
+	% a natureza do espaço público e a qualidade das interações públicas na cidade,
+	% que estão se tornando cada vez mais marcadas por suspeita e restrição.
+	\cite[p.~258-259]{caldeira2000}
+\end{citacao}
+
+No campo da economia urbana, a relação entre criminalidade e habitação é formalizada pela Teoria dos Preços Hedônicos, na qual o valor de um imóvel resulta do somatório implícito de seus atributos intrínsecos e das amenidades locacionais do entorno \cite{teixeira2016}. Sob essa perspectiva, a incidência delituosa recorrente atua como desamenidade exógena, impondo descontos mensuráveis sobre os valores residenciais. Contudo, na prática do mercado paulistano, observa-se uma apropriação predatória desse fenômeno: plataformas comerciais utilizam o medo difuso para supervalorizar condomínios murados, retroalimentando o modelo dos enclaves segregadores, e desvalorizar bairros populares periféricos com base em estigmas, ocultando que delitos patrimoniais de rua concentram-se com frequência em áreas nobres e corredores de grande circulação econômica \cite{nev2024}.
+
+
+Em contraponto à lógica das barreiras físicas e da vigilância privada, \citeonline[cap.~1]{jacobs2011} demonstra que a segurança efetiva do espaço urbano não decorre do isolamento ou do policiamento ostensivo, mas sim da vitalidade pública e do controle voluntário exercido pelos próprios moradores, mecanismo sintetizado no conceito clássico dos ``olhos na rua''. Para a autora, calçadas ativas, fachadas voltadas para o logradouro e a presença equilibrada de comércios, áreas verdes e transporte coletivo atraem fluxos contínuos de pedestres em horários alternados, inibindo oportunidades criminais e construindo redes espontâneas de acolhimento comunitário.
+
+A articulação entre \citeonline{caldeira2000}, \citeonline{teixeira2016} e \citeonline{jacobs2011} fundamenta a necessidade de uma ferramenta que rompa com o binarismo estigmatizante dos ``mapas de perigo''. Para viabilizar uma tomada de decisão habitacional verdadeiramente emancipatória, a análise de segurança precisa ser contextualizada conjuntamente com a oferta de infraestrutura urbana atenuante, equilibrando índices de criminalidade e vitalidade comunitária.
+
+\subsubsection{Transparência pública, dados abertos e acessibilidade em aplicações ricas}
+A concepção de transparência governamental que alicerça o GeoHabita ultrapassa o mero depósito passivo de dados em páginas institucionais. \citeonline{zuccolotto2019}, ao sistematizarem o debate conceitual da transparência na administração pública brasileira, diferenciam a transparência ativa, caracterizada pela divulgação proativa e espontânea de informações pelo poder público, da transparência passiva, que depende de demandas e pedidos formais de acesso provocados pelo munícipe com base na Lei de Acesso à Informação (Lei n\textordmasculine{} 12.527/2011, LAI). Para além da iniciativa, os autores enfatizam que a transparência efetiva exige a conjugação de duas dimensões estruturais: a visibilidade (a disponibilidade efetiva da informação ao escrutínio público) e a capacidade de inferência, que consiste na aptidão do cidadão de processar, compreender e extrair conclusões práticas a partir dos dados disponibilizados.
+
+
+Essa distinção é central para o diagnóstico deste projeto: os portais da Secretaria da Segurança Pública de São Paulo (SSP-SP) e o mapa digital GeoSampa atendem, no plano formal, ao requisito de visibilidade da transparência ativa \cite{ssp2024,geosampa2024}. Todavia, a distribuição desses registros em arquivos brutos agregados por Circunscrição Policial ou em camadas geoespaciais herméticas anula a capacidade de inferência do cidadão comum, que desconhece essas ferramentas ou é incapaz de cruzá-las para aferir a qualidade de sua vizinhança.
+
+Essa disfunção alinha-se às constatações empíricas de \citeonline{michener2018}, que apontam que a transparência estatal brasileira frequentemente frustra o exercício da cidadania devido à fragmentação, ao vocabulário técnico burocrático e à baixa usabilidade das plataformas mantidas pelo Estado.
+
+Quando a administração pública falha em assegurar inferência direta à sociedade, legitima-se a necessidade do que a literatura reconhece como transparência compensatória e tecnologia cívica, em que iniciativas autônomas sistematizam, limpam e devolvem dados públicos de forma inteligível e acionável. Exemplo dessa atuação no cenário nacional é a Operação Serenata de Amor, que utilizou ciência de dados aberta para viabilizar o controle social sobre gastos públicos parlamentares \cite{dalpozzo2020}. O GeoHabita assume função análoga no tecido urbano: converte microdados públicos dispersos em um diagnóstico socioespacial de fácil apreensão para o cidadão em processo de escolha habitacional.
+
+Contudo, a transparência não pode ser plena se mantiver barreiras excludentes de acesso tecnológico. No contexto do desenvolvimento web moderno, \citeonline{padroesAcessibilidade2019} demonstram que as Aplicações Ricas de Internet (RIAs) caracterizadas pela intensa manipulação do DOM em JavaScript e pela troca de mensagens assíncronas via AJAX/Fetch representaram avanços visuais notáveis, mas frequentemente resultaram em um ``apagão'' informativo para pessoas com deficiência visual. Como sistematizado pelos autores, mapas dinâmicos e atualizações parciais de tela deixam de ser capturados por sintetizadores de voz e leitores de tela (como NVDA, JAWS e Orca) na ausência das diretrizes de acessibilidade da WCAG 2.1 e das marcações semânticas da especificação WAI-ARIA (com destaque para \emph{roles}, estados, propriedades e regiões vivas). A garantia da acessibilidade digital erige-se, portanto, como condição estrutural de conformidade à Lei Brasileira de Inclusão e como dever ético da tecnologia cívica.
+
+\subsubsection{Engenharia de software, modelagem geoespacial e desenvolvimento web}
+A viabilidade técnica e a sustentabilidade operacional da plataforma apoiam-se em referências consagradas da engenharia de software. \citeonline{pressman2021} conceituam a engenharia de software como uma abordagem sistemática, disciplinada e quantificável aplicada ao desenvolvimento, à operação e à manutenção de sistemas computacionais. Os autores organizam a disciplina em dimensões essenciais: processo, modelagem, qualidade e segurança, e projeto de experiência do usuário (UX), destacando a convergência entre métodos ágeis e práticas rigorosas de engenharia. Essa visão norteia o GeoHabita desde a especificação de requisitos e elaboração de casos de uso até a modelagem estrutural e as rotinas de testes automatizados, estruturando o desenvolvimento em ciclos incrementais adequados ao horizonte temporal de um Projeto Integrador. A ênfase na experiência do usuário é diretamente aplicada na construção de uma interface inclusiva, fluida e descomplicada para indivíduos em busca de habitação.
+
+\citeonline{sommerville2018}, por sua vez, dedica atenção especial à engenharia de requisitos, às práticas do desenvolvimento ágil com Scrum e ao projeto arquitetural de sistemas web distribuídos. O autor enfatiza a separação de responsabilidades em camadas desacopladas, separando apresentação, serviços de aplicação e persistência, a concepção de componentes reutilizáveis e o planejamento para evolução do código após o ciclo inicial de implantação. Essas diretrizes são basilares para a concepção do Produto Mínimo Viável (MVP) do GeoHabita, cuja arquitetura articula um cliente web reativo em JavaScript, um serviço de retaguarda estruturado em Node.js como camada integradora de APIs externas (ViaCEP, BrasilAPI e servidores municipais) e um banco de dados relacional dotado de extensão geoespacial (PostGIS).
+
+A adoção do Scrum, conforme delineada por Sommerville, mostra-se ideal para a dinâmica da equipe, permitindo que sprints curtas produzam incrementos funcionais testáveis em ritmo constante. A complementaridade entre as abordagens de \citeonline{pressman2021} (com foco em processo, qualidade e UX) e \citeonline{sommerville2018} (com ênfase em requisitos, arquitetura distribuída e modularidade) fornece o arcabouço metodológico necessário para construir uma plataforma web tecnicamente robusta, acessível e orientada ao interesse público.
+
+\subsection{Metodologia}
+
+O desenvolvimento do GeoHabita adota a abordagem do \emph{Design Thinking}, metodologia ancorada no ser humano que estrutura a solução de problemas complexos em iterações cíclicas de empatia, definição, ideação, prototipação e teste \cite{brown2010}.
+
+No âmbito deste Projeto Integrador, o trabalho organiza-se em torno das três fases fundamentais sugeridas pela Univesp: escuta e interpretação do contexto, criação e prototipagem, e execução e validação. Por se tratar de um relatório parcial, o projeto está concentrado no diagnóstico e no planejamento conceitual: realizaram-se a imersão de campo e a formalização da modelagem do sistema (especificação de requisitos, arquitetura em camadas e diagramas conceituais), restando à etapa subsequente a codificação plena, a ingestão definitiva do banco e os testes de homologação.
+
+\textbf{Ouvir e interpretar o contexto.} A coleta de dados empíricos desenvolveu-se durante setembro,
+mediante abordagens presenciais que aplicaram roteiro semiestruturado (reproduzido no Apêndice \ref{apendice:questionario}). Para garantir representatividade da mobilidade metropolitana, as ações concentraram-se em nós estratégicos de transporte intermodal e de grande fluxo de pedestres da capital: Terminal Pinheiros, Terminal Palmeiras-Barra Funda e praças de grande fluxo. O formulário incluía uma pergunta-filtro eliminatória inicial, permitindo prosseguimento apenas com transeuntes que confirmaram interesse ativo em imóvel (compra ou locação) em São Paulo nos últimos doze meses. Considerando o caráter sensível dos temas tratados — incluindo retorno noturno, questões de segurança patrimonial e dinâmicas familiares —, o instrumento instituiu a **pseudonimização** para as contribuições: as respostas foram dissociadas de qualquer dado identificativo no texto deste trabalho (atribuindo códigos anônimos de Munícipe 1 a 10), mantidos sob posse limitada e temporária da equipe exclusivamente para permitir as sessões de validação e testes de usabilidade planejados na fase de implementação. Para análise das respostas, empregou-se a técnica de análise de conteúdo categorial \cite{bardin2016}, que possibilitou extrair núcleos de sentido e classificar sistematicamente as preocupações relatadas em eixos temáticos.
+
+\textbf{Criar e prototipar.} O processo de ideação converteu as categorias obtidas da escuta em
+requisitos de engenharia de software, alinhado às práticas documentadas por \citeonline{pressman2021} e \citeonline{sommerville2018}. A especificação técnica abrangeu o inventário de requisitos funcionais e não funcionais hierarquizados pela matriz MoSCoW, a modelagem de casos de uso e o projeto da estrutura relacional do banco de dados com extensões espaciais. Pautado pelo princípio de \emph{Accessibility by Design}, reduzindo as barreiras das interfaces dinâmicas apontadas por
+\citeonline{padroesAcessibilidade2019}, garantiu-se a equivalência textual dos mapas por meio de
+tabelas semânticas e markup WAI-ARIA desde o início da concepção dos wireframes.
+
+\textbf{Implementar e testar.} A concretização da ferramenta no ciclo seguinte utilizará um
+ecossistema híbrido voltado para desempenho e segregação de responsabilidades: serviço de retaguarda em Python (coordenando rotas, acesso a APIs e operações analíticas), persistência espacial em SQL (PostgreSQL/PostGIS) e scripts front-end em JavaScript dedicados à interatividade de formulários, consumo assíncrono via \texttt{fetch}, controle de regiões ativas (\texttt{aria-live}) e renderização cartográfica simplificada. A garantia de qualidade contemplará testes unitários de regras de negócio, auditorias automáticas de acessibilidade e validação de usabilidade em duas etapas (confirmação conceitual dos wireframes e, em seguida, homologação do protótipo funcional com usuários reais e tecnologias assistivas).
+
+A condução das atividades ocorre pela equipe sob metodologia ágil inspirada no
+\emph{Scrum} \cite{sommerville2018}, estruturada em sprints quinzenais. O controle de versões é
+administrado via repositório centralizado no GitHub, disponível em:
+\url{https://github.com/DanielaMunizSouza/pi2-indicadores-seguranca-publica}.
+
+\subsection{Resultados}
+Os resultados são expostos conforme as três fases da metodologia, acompanhando a construção da solução desde a escuta dos moradores até a especificação e prototipagem da plataforma. Por se tratar de relatório parcial, os resultados focam no diagnóstico empírico e na modelagem do sistema; os artefatos aqui descritos são protótipos conceituais que orientarão a etapa executiva de codificação.
+
+\subsubsection{Ouvir: diagnóstico junto à comunidade}
+A realização do questionário em formato presencial nos terminais e praças envolveu dez munícipes com perfis diversificados em relação à renda, faixa etária e interesse habitacional (Quadro sintético e transcrições no Apêndice \ref{apendice:questionario}). No que tange à sensibilidade inerente ao tema, 100\% dos participantes optaram explicitamente pela \textbf{preservação de sua identidade pública por meio de pseudonimização} (identificados como Munícipe 1 a Munícipe 10), conferindo autorização expressa para a manutenção de contato confidencial destinada à devolutiva e avaliação das interfaces desenhadas. A análise das respostas evidenciou cenário de forte assimetria informacional e decisões tomadas com base em informação inadequada: todos os dez participantes relataram fundamentar suas escolhas apenas em comentários informais de conhecidos ou no material publicitário das imobiliárias. Quando questionados diretamente sobre conhecimento do mapa digital GeoSampa ou das planilhas estatísticas mensais da SSP-SP, a resposta foi unânime (dez respostas ``Não''). O achado validou empiricamente a disfunção conceituada por \citeonline{zuccolotto2019}: o Estado paulista mantém formalmente a transparência ativa visível, mas não oferece a capacidade de inferência necessária ao cidadão comum. A aplicação da análise categorial \cite{bardin2016} agrupou as queixas dos entrevistados em três eixos:
+
+
+
+\begin{enumerate}
+  \item \textbf{Iluminação pública e fluxo de pedestres} nos percursos a pé;
+  \item \textbf{Acessibilidade e proximidade física a eixos estruturados de transporte coletivo};
+  \item \textbf{Falta de dados criminais auditáveis} em escala de vizinhança.
+\end{enumerate}
+
+Notavelmente, as duas primeiras preocupações referem-se à infraestrutura urbana cotidiana, não a estatísticas criminais isoladas. Interpretado sob a ótica da teoria de vitalidade urbana de \citeonline[cap.~2]{jacobs2011}, esse resultado motivou reorientação profunda no escopo do projeto: a segurança pública passou a ser modelada como reflexo direto da ocupação do espaço público e da rede comunitária gerada por praças, parques, feiras livres, escolas, unidades de saúde e nós de transporte (os ``olhos na rua''). O desafio do GeoHabita consolidou-se em transformar o CEP em síntese equilibrada entre oferta de serviços urbanos essenciais e dados oficiais de segurança, superando a lógica estigmatizante dos ``mapas de calor e perigo'' criticada por \citeonline{caldeira2000}.
+
+\subsubsection{Criar: especificação e arquitetura da solução}
+
+Na ideação, foram expressamente descartadas rotinas de extração não estruturada (\emph{web scraping}) e modelagens preditivas criminais, por inviabilidade temporal do projeto e pelo risco de reforçar estigmas socioespaciais \cite{caldeira2000}. Para responder aos três eixos do diagnóstico sem fundir os dados em uma nota única artificial, definiu-se abordagem analítica paralela:
+
+\begin{itemize}
+  \item \textbf{Índice de Proximidade Local (IPL):} mede a distância métrica e o tempo a pé até o equipamento público mais próximo de cada categoria (saúde, transporte, lazer);
+  \item \textbf{Índice de Vitalidade do Espaço Público (IVEP):} compara a densidade global de infraestrutura urbana entre os 96 distritos paulistanos;
+  \item \textbf{Painel de Ocorrências Oficiais:} exibe taxas padronizadas por 100 mil habitantes da circunscrição policial correspondente, acompanhadas da data de referência e notas técnicas sobre subnotificação.
+\end{itemize}
+
+A especificação do MVP, elaborada segundo \citeonline{pressman2021} e \citeonline{sommerville2018}, resultou em 25 requisitos funcionais, 18 requisitos não funcionais e 16 regras de negócio. Os requisitos funcionais foram hierarquizados pelo método MoSCoW, sendo 14 classificados como essenciais, organizando-se em cinco módulos: consulta de endereço (RF01 a RF06), diagnóstico socioespacial (RF07 a RF12 e RF23 a RF25), visualização acessível (RF13 a RF15), comparação e compartilhamento (RF16 a RF18) e administração dos dados (RF19 a RF22). Os requisitos não funcionais cobrem desempenho, conformidade WCAG 2.1 nível AA, e-MAG, segurança, LGPD e Lei Brasileira de Inclusão (detalhados no Apêndice~\ref{ap:requisitos}).
+
+O sistema prevê três perfis de interação, modelados no diagrama de casos de uso (Figura~\ref{fig:casos-de-uso}): o Munícipe (consultas públicas e ajustes de preferência), o Usuário de tecnologia assistiva (navegação semântica orientada por leitor de tela ou teclado) e o Administrador de dados (gestão das rotinas ETL de atualização).
+
+\begin{figure}[!h]
+	\caption{Diagrama de casos de uso do MVP do GeoHabita}
+	\label{fig:casos-de-uso}
+	\centering
+	\imgura{\textwidth}{img/casos_uso.png}
+	\fonte{Elaborado pelo autor (2026).}
+\end{figure}
+
+\begin{sloppypar}
+O banco de dados relacional foi modelado com oito entidades no diagrama de entidade-relacionamento (Figura~\ref{fig:mer}). A entidade \texttt{Distrito} armazena os 96 polígonos municipais do GeoSampa e a população censitária. \texttt{Categoria} e \texttt{Tipo de Equipamento} estruturam as amenidades urbanas e fixam os parâmetros de distância de caminhabilidade do IPL. \texttt{Equipamento} guarda a coordenada geográfica pontual de cada serviço público, e \texttt{Ocorrência} registra os dados oficiais da SSP-SP. As entidades \texttt{Indicador do Distrito} e \texttt{Carga ETL} asseguram rastreabilidade temporal e auditoria das séries históricas, enquanto \texttt{Cache de CEP} otimiza as buscas geográficas reduzindo requisições externas.
+\end{sloppypar}
+
+\begin{figure}[!h]
+	\caption{Diagrama de entidade-relacionamento do banco de dados}
+	\label{fig:mer}
+	\centering
+	\imgura{\textwidth}{img/mer.png}
+	\fonte{Elaborado pelo autor (2026).}
+\end{figure}
+
+A arquitetura de software estrutura-se em camadas desacopladas (Figura~\ref{fig:arquitetura}), seguindo \citeonline{sommerville2018}. A camada de apresentação web (HTML5 semântico com folhas de estilo responsivas, WAI-ARIA e JavaScript para interatividade acessível) comunica-se via JSON com o \emph{backend} em Python. Na aplicação servidora, a camada de aplicação orquestra as regras de negócio e o cálculo espacial dos indicadores, enquanto a infraestrutura acessa as consultas PostGIS em SQL (\texttt{ST\_DWithin} e \texttt{ST\_Contains}) e gerencia os serviços de contingência entre ViaCEP e BrasilAPI.
+
+\begin{figure}[!h]
+	\caption{Arquitetura em camadas do GeoHabita}
+	\label{fig:arquitetura}
+	\centering
+	\imgura{\textwidth}{img/arquitetura.png}
+	\fonte{Elaborado pelo autor (2026).}
+\end{figure}
+
+O fluxo de uso do cidadão, abrangendo desde a inserção do CEP até a exibição dos índices e o tratamento de eventuais erros de digitação, está esquematizado na Figura~\ref{fig:fluxo}.
+
+\begin{figure}[!h]
+	\caption{Fluxo de consulta do munícipe na plataforma}
+	\label{fig:fluxo}
+	\centering
+	\imgura[7cm]{0.6\textwidth}{img/fluxo_usuario.png}
+	\fonte{Elaborado pelo autor (2026).}
+\end{figure}
+
+Por fim, consolidaram-se os \emph{wireframes} de baixa fidelidade para validar a interface. A tela inicial (Figura~\ref{fig:wf-inicial}) concentra a consulta por CEP e controles fixos de acessibilidade (alto contraste, atalhos do teclado e redimensionamento). A tela de diagnóstico (Figura~\ref{fig:wf-diagnostico}) organiza os dados em abas (Proximidade, Vitalidade e Ocorrências) e traz a aba obrigatória ``Ver como tabela'', assegurando a equivalência textual de mapas recomendada por \citeonline{padroesAcessibilidade2019}.
+
+\begin{figure}[!h]
+	\caption{\emph{Wireframe} da tela inicial de consulta}
+	\label{fig:wf-inicial}
+	\centering
+	\imgura{0.85\textwidth}{img/wireframe_inicial.png}
+	\fonte{Elaborado pelo autor (2026).}
+\end{figure}
+
+\begin{figure}[!h]
+	\caption{\emph{Wireframe} da tela de diagnóstico do endereço}
+	\label{fig:wf-diagnostico}
+	\centering
+	\imgura{\textwidth}{img/wireframe_diagnostico.png}
+	\fonte{Elaborado pelo autor (2026). Dados ilustrativos.}
+\end{figure}
+\subsubsection{Implementar: planejamento da construção e da validação}
+A codificação do MVP ainda não foi iniciada. Nesta etapa preliminar, estruturaram-se o repositório de código com controle de versão e o planejamento incremental do desenvolvimento, dividido em uma sprint inicial de ambiente e quatro sprints quinzenais de entrega funcional: (1) Consulta de CEP com resolução de coordenadas e contingência; (2) Ingestão espacial do GeoSampa e cálculo do IPL; (3) Carga dos dados da SSP-SP, cálculo do IVEP e geração das tabelas semânticas; e (4) Ajustes de preferência, painel cívico e modo de alto contraste. Os casos de teste foram derivados previamente dos requisitos e regras de negócio, viabilizando sua escrita concomitante à codificação. A validação em campo ocorrerá em duas etapas sucessivas:
+\begin{enumerate}
+	\item \textbf{Validação Conceitual dos Wireframes:} apresentação dos protótipos de baixa fidelidade aos dez entrevistados, verificando se a disposição das informações atende às expectativas e se os termos utilizados são compreensíveis;
+	\item \textbf{Testes de Usabilidade e Acessibilidade do MVP Funcional:} execução de roteiros de tarefas com o sistema publicado em nuvem, incluindo testes práticos de navegação por teclado e por leitores de tela (NVDA/Orca) para certificar a usabilidade universal antes da entrega final.
+\end{enumerate}
+
+
+\phantompart
+
+% ---
+% Conclusão
+% ---
+% \chapter{Conclusão}
+% ---
+
+% \lipsum[31-33]
+
+% ----------------------------------------------------------
+% ELEMENTOS PÓS-TEXTUAIS
+% ----------------------------------------------------------
+\postextual
+
+% ----------------------------------------------------------
+% Referências bibliográficas
+% ----------------------------------------------------------
+\bibliography{references}
+
+% ----------------------------------------------------------
+% Glossário
+% ----------------------------------------------------------
+%
+% Consulte o manual da classe abntex2 para orientações sobre o glossário.
+%
+%\glossary
+
+% ----------------------------------------------------------
+% Apêndices
+% ----------------------------------------------------------
+
+% ---
+% Inicia os apêndices
+% ---
+\begin{apendicesenv}
+
+	% Imprime uma página indicando o início dos apêndices
+	% \partapendices
+
+	% ----------------------------------------------------------
+	\chapter{Especificação de requisitos de software}
+	\label{ap:requisitos}
+	% ----------------------------------------------------------
+	\include{requisitos_geohabita}
+
+	\chapter{Coleta de Dados com a Comunidade}
+	\include{apendice_questionario}
+	% \includepdf[
+	% 	pages=-,
+	% 	pagecommand={\thispagestyle{fancy}\fancyhf{}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0pt}},
+	% ]{ERS_Prisma_Politico_MVP.pdf}
+
+\end{apendicesenv}
+% ---
+
+
+% ----------------------------------------------------------
+% Anexos
+% ----------------------------------------------------------
+
+% ---
+% Inicia os anexos
+% ---
+% \begin{anexosenv}
+
+% Imprime uma página indicando o início dos anexos
+% \partanexos
+
+% ---
+% \chapter{Licença do Software AGPL}
+
+% \includedoc{AGPL.tex}
+
+% \end{anexosenv}
+
+%---------------------------------------------------------------------
+% INDICE REMISSIVO
+%---------------------------------------------------------------------
+
+% \phantompart
+
+% \printindex
+
+%---------------------------------------------------------------------
+% Formulário de Identificação (opcional)
+%---------------------------------------------------------------------
+% \chapter*[Formulário de Identificação]{Formulário de Identificação}
+% \addcontentsline{toc}{chapter}{Exemplo de Formulário de Identificação}
+% \label{formulado-identificacao}
+
+% Exemplo de Formulário de Identificação, compatível com o Anexo A (informativo)
+% da ABNT NBR 10719:2015. Este formulário não é um anexo. Conforme definido na
+% norma, ele é o último elemento pós-textual e opcional do relatório.
+
+% \bigskip
+
+% \begin{tabular}{|p{9cm}|p{5cm}|}
+% \hline
+% \multicolumn{2}{|c|}{\textbf{\large Dados do Relatório Técnico e/ou científico}}\\
+% \hline
+% \multirow{4}{10cm}[24pt]{Título e subtítulo}& Classificação de segurança\\
+%                    & \\
+%                    \cline{2-2}
+%                    & No.\\
+%                    & \\
+
+% \hline
+% Tipo de relatório & Data\\
+% \hline
+% Título do projeto/programa/plano & No.\\
+% \hline
+% \multicolumn{2}{|l|}{Autor(es)} \\
+% \hline
+% \multicolumn{2}{|l|}{Instituição executora e endereço completo} \\
+% \hline
+% \multicolumn{2}{|l|}{Instituição patrocinadora e endereço completo} \\
+% \hline
+% \multicolumn{2}{|l|}{Resumo}\\[3cm]
+% \hline
+% \multicolumn{2}{|l|}{Palavras-chave/descritores}\\
+% \hline
+% \multicolumn{2}{|l|}{
+% Edição \hfill No. de páginas \hfill No. do volume \hfill Nº de classificação \phantom{XXXX}} \\
+% \hline
+% \multicolumn{2}{|l|}{
+% ISSN \hfill \hfill Tiragem \hfill Preço \phantom{XXXXXXXX}} \\
+% \hline
+% \multicolumn{2}{|l|}{Distribuidor} \\
+% \hline
+% \multicolumn{2}{|l|}{Observações/notas}\\[3cm]
+% \hline
+% \end{tabular}
+
+\end{document}

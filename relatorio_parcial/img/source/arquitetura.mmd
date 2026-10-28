@@ -1,0 +1,50 @@
+%% Arquitetura em camadas do GeoHabita
+%% Renderizar: mmdc -i arquitetura.mmd -o arquitetura.pdf --pdfFit
+%%{init: {'theme':'neutral', 'themeVariables': {'fontFamily':'Arial'}}}%%
+flowchart TB
+    subgraph CLIENTE["Cliente web (navegador)"]
+        direction LR
+        UI["HTML semântico<br/>e WAI-ARIA"]
+        JS["JavaScript<br/>consulta, pesos, recálculo"]
+        MAPA["Leaflet + OpenStreetMap"]
+    end
+
+    subgraph SERVIDOR["Serviço de retaguarda (Python / Flask) — nuvem"]
+        direction TB
+        AP["Apresentação<br/>rotas e API REST"]
+        APL["Aplicação<br/>serviços de consulta e diagnóstico"]
+        DOM["Domínio<br/>regras RN01–RN16, IPL, IVEP, taxas"]
+        INF["Infraestrutura<br/>adaptadores de APIs e repositórios"]
+        AP --> APL --> DOM
+        APL --> INF
+    end
+
+    subgraph DADOS["Persistência"]
+        DB[("PostgreSQL + PostGIS<br/>distritos, equipamentos,<br/>ocorrências, indicadores")]
+        CACHE[("Cache de CEP<br/>e geocodificação")]
+    end
+
+    subgraph TEMPO_REAL["APIs em tempo real"]
+        CEP["ViaCEP / BrasilAPI"]
+        GEO["Nominatim (OSM)"]
+    end
+
+    subgraph ABERTOS["Dados abertos (carga periódica)"]
+        direction TB
+        GS["GeoSampa (WFS)"]
+        SSP["SSP-SP (microdados)"]
+        IBGE["IBGE (Censo 2022)"]
+        ETL["Rotinas ETL<br/>validação e versionamento"]
+    end
+
+    UI --- JS
+    JS --- MAPA
+    JS -- "HTTPS / JSON" --> AP
+    INF --> DB
+    INF --> CACHE
+    INF --> CEP
+    INF --> GEO
+    GS --> ETL
+    SSP --> ETL
+    IBGE --> ETL
+    ETL --> DB

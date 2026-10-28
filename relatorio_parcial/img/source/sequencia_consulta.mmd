@@ -1,0 +1,41 @@
+%% Sequência da consulta por CEP até o diagnóstico
+%% Renderizar: mmdc -i sequencia_consulta.mmd -o sequencia_consulta.pdf --pdfFit
+%%{init: {'theme':'neutral', 'themeVariables': {'fontFamily':'Arial'}}}%%
+sequenceDiagram
+    autonumber
+    actor U as Munícipe
+    participant F as Cliente web
+    participant B as Serviço de retaguarda
+    participant C as Cache de CEP
+    participant V as ViaCEP
+    participant BR as BrasilAPI / Nominatim
+    participant DB as PostgreSQL + PostGIS
+
+    U->>F: Informa o CEP
+    F->>F: Valida formato (8 dígitos) — RN01
+    F->>B: GET /api/diagnostico?cep=...
+    B->>C: Busca CEP no cache
+    alt CEP em cache (até 30 dias) — RN04
+        C-->>B: Endereço, coordenadas e distrito
+    else CEP não armazenado
+        B->>V: Consulta endereço
+        alt ViaCEP responde em até 3 s
+            V-->>B: Logradouro, bairro, código IBGE
+        else Erro ou tempo excedido — RN03
+            B->>BR: Consulta de contingência
+            BR-->>B: Endereço
+        end
+        B->>BR: Geocodifica endereço
+        BR-->>B: Latitude e longitude
+        B->>DB: Ponto-em-polígono (distritos)
+        DB-->>B: Distrito
+        B->>C: Armazena resultado
+    end
+    B->>DB: Vizinho mais próximo por tipo de equipamento
+    DB-->>B: Distâncias d_j
+    B->>B: Calcula notas s_j e IPL — RN12 a RN16
+    B->>DB: Lê IVEP e taxas do distrito
+    DB-->>B: Indicadores com fonte e data
+    B-->>F: Diagnóstico (JSON)
+    F->>F: Atualiza mapa e tabela equivalente
+    F-->>U: Anuncia "Diagnóstico concluído" (região viva)

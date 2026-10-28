@@ -1,0 +1,50 @@
+@startuml casos_uso
+' Diagrama de casos de uso do GeoHabita (MVP)
+' Renderizar: java -jar plantuml.jar -tsvg casos_uso.puml
+!pragma layout smetana
+left to right direction
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Munícipe" as M
+actor "Usuário de\ntecnologia assistiva" as TA
+actor "Administrador\nde dados" as ADM
+actor "APIs de CEP e\ngeocodificação" as API <<sistema>>
+actor "Bases abertas\n(GeoSampa, SSP-SP, IBGE)" as BASES <<sistema>>
+
+TA -|> M
+
+rectangle "GeoHabita" {
+  usecase "UC01 – Consultar endereço\n(CEP ou endereço)" as UC01
+  usecase "UC02 – Visualizar diagnóstico\nsocioespacial" as UC02
+  usecase "UC02a – Avaliar proximidade\ndo endereço (IPL)" as UC02a
+  usecase "UC03 – Personalizar\nprioridades (pesos)" as UC03
+  usecase "UC04 – Explorar mapa ou\ntabela equivalente" as UC04
+  usecase "UC05 – Comparar\nlocalidades" as UC05
+  usecase "UC06 – Compartilhar ou\nexportar diagnóstico" as UC06
+  usecase "UC07 – Atualizar bases\nde dados (ETL)" as UC07
+}
+
+M --> UC01
+M --> UC02
+M --> UC04
+M --> UC05
+
+UC02 ..> UC01 : <<include>>
+UC02 ..> UC02a : <<include>>
+UC03 ..> UC02 : <<extend>>
+UC06 ..> UC02 : <<extend>>
+UC05 ..> UC02 : <<include>>
+
+ADM --> UC07
+
+UC01 --> API
+UC07 --> BASES
+@enduml

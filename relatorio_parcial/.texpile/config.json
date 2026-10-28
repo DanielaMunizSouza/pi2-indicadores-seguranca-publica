@@ -1,0 +1,8 @@
+{
+	"v": 1,
+	"main": "main.tex",
+	"latex": {
+		"command": "latexmk -cd -lualatex -interaction=nonstopmode -file-line-error -synctex=1 -output-directory=output {main}",
+		"liveMode": true
+	}
+}
