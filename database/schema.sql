@@ -83,3 +83,4 @@ CREATE TABLE IF NOT EXISTS public.carga_etl (
  situacao text NOT NULL DEFAULT 'concluida'
 );
 CREATE INDEX IF NOT EXISTS ix_carga_arquivo ON public.carga_etl(arquivo,executada_em DESC);
+ALTER TABLE public.carga_etl ADD COLUMN IF NOT EXISTS assinatura text;
