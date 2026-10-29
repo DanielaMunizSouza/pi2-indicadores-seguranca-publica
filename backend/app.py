@@ -9,7 +9,9 @@ from geohabita.application.rate_limit import RateLimiter
 from geohabita.application.cep_lookup import CepLookup,CepNotFoundError,ProviderError
 from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE,OUT_OF_CITY_MESSAGE,is_sao_paulo
-from geohabita.infrastructure.cep_providers import brasilapi,viacep
+from geohabita.application.diagnosis import DiagnosisService,LocationNotFoundError
+from geohabita.infrastructure.cep_providers import brasilapi,brasilapi_coordinates,viacep
+from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
 
 ROOT=Path(__file__).resolve().parents[1]
 # Read local configuration when present; environment variables still take precedence.
@@ -78,6 +80,35 @@ def cep_address(cep:str):
     return {"cep":address.cep,"logradouro":address.street,"bairro":address.neighbourhood,"municipio":address.city,
       "dentro_sao_paulo":inside,"aviso":None if inside else OUT_OF_CITY_MESSAGE,
       "latitude":address.latitude,"longitude":address.longitude,"nota_localizacao":APPROXIMATE_LOCATION_NOTICE}
+
+# Diagnóstico socioespacial (UC02): proximidade e IPL, vitalidade e IVEP, ocorrências.
+# O ViaCEP não traz coordenadas: elas vêm da BrasilAPI ou, na falta, da mediana das
+# coordenadas das ocorrências registradas com o mesmo CEP.
+diagnosis_repository=PostgisDiagnosisRepository(connect)
+diagnosis_service=DiagnosisService(diagnosis_repository,cep_service,geocoders=[
+    ("brasilapi",brasilapi_coordinates),("registros_ssp",diagnosis_repository.cep_centroid)])
+def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetros os confunde
+    return Query(1,ge=0,le=5,description="Peso da categoria, inteiro de 0 a 5 (RN06).")
+
+@app.get("/api/diagnostico")
+def diagnostico(cep:str|None=Query(None,description="CEP do endereço (8 dígitos)."),
+                lat:float|None=Query(None,ge=-90,le=90),lon:float|None=Query(None,ge=-180,le=180),
+                peso_lazer_convivencia:int=peso(),peso_cultura_esporte:int=peso(),peso_mobilidade:int=peso(),
+                peso_comercio_rua:int=peso(),peso_servicos_essenciais:int=peso(),peso_conectividade:int=peso()):
+    """Diagnóstico de um CEP ou de uma coordenada, em três blocos independentes (RN07)."""
+    pesos={"lazer_convivencia":peso_lazer_convivencia,"cultura_esporte":peso_cultura_esporte,
+           "mobilidade":peso_mobilidade,"comercio_rua":peso_comercio_rua,
+           "servicos_essenciais":peso_servicos_essenciais,"conectividade":peso_conectividade}
+    if (cep is None)==(lat is None or lon is None):
+        raise HTTPException(400,"Informe o CEP ou a latitude e a longitude.")
+    try:
+        if cep is not None: return diagnosis_service.diagnose_cep(cep,pesos)
+        return diagnosis_service.diagnose_point(lat,lon,pesos)
+    except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
+    except ValueError as exc: raise HTTPException(400,str(exc)) from exc
+    except CepNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
+    except LocationNotFoundError as exc: raise HTTPException(422,str(exc)) from exc
+    except ProviderError as exc: raise HTTPException(503,"Os serviços de CEP estão indisponíveis. Tente novamente em instantes.") from exc
 
 @app.get("/api/categories")
 def categories(): return [{"value":k,"label":v} for k,v in CATEGORIES.items()]
