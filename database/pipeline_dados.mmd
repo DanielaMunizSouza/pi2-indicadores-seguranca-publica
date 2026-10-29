@@ -34,7 +34,8 @@ flowchart LR
         SYNC["remove do banco arquivos<br/>que saíram do escopo"]
     end
 
-    RES["resumo<br/><i>ponto-em-polígono PostGIS</i>"]
+    RES["resumo<br/><i>distrito de cada ocorrência nova<br/>(polígonos subdivididos)</i>"]
+    IND["indicadores<br/><i>percentis do IVEP · ocorrências<br/>por natureza e ano</i>"]
 
     %% ---------- tabelas ----------
     subgraph DB["PostgreSQL / PostGIS"]
@@ -43,6 +44,8 @@ flowchart LR
         TO[("registro_ocorrencia")]
         TC[("carga_etl")]
         TR[("resumo_distrito_diario<br/>resumo_ocorrencia_diario")]
+        TOD[("ocorrencia_distrito")]
+        TI[("indicador_distrito")]
     end
 
     REF --> DIST --> TD
@@ -69,8 +72,15 @@ flowchart LR
     TO --> RES
     TD --> RES
     RES --> TR
+    RES --> TOD
+    RES ==> IND
+    POP ==> IND
+    GC ==> IND
+    TE --> IND
+    TOD --> IND
+    IND --> TI
 
     classDef etapa fill:#e8f0fe,stroke:#3367d6
     classDef arquivo fill:#fff4e5,stroke:#e8a33d
-    class DIST,POP,GB,GC,DL,CONV,LOAD,SYNC,RES etapa
+    class DIST,POP,GB,GC,DL,CONV,LOAD,SYNC,RES,IND etapa
     class REF,GJ,CSV arquivo

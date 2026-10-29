@@ -13,10 +13,13 @@ Baixe os CSVs dos períodos disponíveis e salve-os com os nomes originais na pa
 `uv run --env-file .env scripts/pipeline_dados.py` executa todas as etapas. As que não dependem umas das outras rodam em paralelo, em três trilhas que se juntam no resumo do mapa:
 
 ```
-distritos ──> ibge-populacao ─────────────────┐
-geosampa-baixar ──> geosampa-carregar         ├──> resumo
-ssp-baixar ──> ssp-carregar ──────────────────┘
+distritos ──> ibge-populacao ─────────────────────────────┐
+geosampa-baixar ──> geosampa-carregar ────────────────────┤
+ssp-baixar ──> ssp-carregar ──> resumo ──> indicadores <──┘
 ```
+
+- `resumo` grava o distrito de cada ocorrência em `ocorrencia_distrito` (ponto-em-polígono com os polígonos subdivididos). Isso é feito uma vez por linha: a primeira execução leva cerca de 10 minutos e as seguintes só tratam as linhas novas. Se os limites dos distritos mudarem, a etapa `distritos` apaga as atribuições para que sejam refeitas.
+- `indicadores` grava em `indicador_distrito` os percentis do IVEP por categoria (média das posições percentis da densidade por km² e por 10 mil habitantes) e as ocorrências por grupo de natureza e ano, que alimentam `/api/diagnostico`.
 
 - `--etapas` roda só algumas etapas; as dependências valem apenas entre as escolhidas.
 - `--workers N` define quantos processos ou conexões cada etapa usa ao mesmo tempo. O padrão é o número de núcleos menos 1 (mínimo 2).
