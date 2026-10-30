@@ -18,6 +18,27 @@ py -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 
 Abra http://127.0.0.1:8000. A API interativa está em http://127.0.0.1:8000/docs. Não envie senhas ao GitHub.
 
+### Linux
+
+Requer Python 3.12 ou superior com o módulo `venv` (em Debian e Ubuntu, instale `python3-venv`). Na raiz do projeto, depois de criar `.env` como no passo 1:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt -r requirements-web.txt
+python scripts/importar_distritos_sp.py
+python scripts/atualizar_resumo_distritos.py
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+```
+
+A aplicação e as duas rotinas acima leem `.env` automaticamente. O importador `scripts/carregar_ssp.py` lê apenas variáveis de ambiente; exporte o conteúdo de `.env` na mesma sessão antes de usá-lo:
+
+```bash
+set -a; source .env; set +a
+```
+
+Em novas sessões do terminal, ative o ambiente novamente com `source .venv/bin/activate`.
+
 ## Banco para os demais integrantes
 
 GitHub não hospeda uma conexão PostgreSQL ao vivo. O repositório contém o esquema e um Compose opcional que inicia uma cópia local com PostGIS na porta 5433 (após instalar Docker Desktop): copie .env.example para .env, altere a senha e rode:
@@ -25,6 +46,8 @@ GitHub não hospeda uma conexão PostgreSQL ao vivo. O repositório contém o es
 ```powershell
 docker compose --env-file .env -f database/docker-compose.yml up -d
 ```
+
+No Linux, o mesmo comando funciona com Docker Engine e o plugin Compose (pacote `docker-compose-plugin` ou equivalente da distribuição), sem Docker Desktop. Se o usuário não pertencer ao grupo `docker`, prefixe o comando com `sudo`. Na primeira inicialização, o contêiner executa `database/schema.sql` automaticamente. Para um PostgreSQL instalado no sistema, com a extensão PostGIS, aplique o esquema com `psql "postgresql://usuario:senha@localhost:5432/banco" -f database/schema.sql`.
 
 Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `py scripts/importar_distritos_sp.py` e `py scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
 
@@ -35,6 +58,8 @@ Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB po
 ```powershell
 py scripts/carregar_ssp.py --diretorio "data/raw/Dados Segurança Publica/SSP.SP/CSV"
 ```
+
+No Linux, use `python` no lugar de `py`, com o ambiente ativado e `.env` exportado (ver [Linux](#linux)).
 
 O importador reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use scripts/padronizar_csvs_ssp.py com --origem e --destino. Saídas em data/processed não são versionadas.
 
