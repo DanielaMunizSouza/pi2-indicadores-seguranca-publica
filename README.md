@@ -5,39 +5,25 @@ Aplicação web para explorar registros públicos SSP-SP por CEP, categoria, per
 ## Aplicação web
 
 1. Na raiz do projeto, crie `.env` a partir de `.env.example` e ajuste a conexão para a senha, porta, usuário e banco indicados no pgAdmin. A senha fica somente em `.env`, que é ignorado pelo Git. Se ela contiver caracteres reservados de URL, codifique-os (por exemplo, `@` como `%40`).
-2. No PowerShell na raiz do projeto:
+2. Instale o [uv](https://docs.astral.sh/uv/), que gerencia o Python, o ambiente virtual e as dependências do projeto (declaradas em `pyproject.toml` e fixadas em `uv.lock`):
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-py -m pip install -r requirements.txt -r requirements-web.txt
-py scripts/importar_distritos_sp.py
-py scripts/atualizar_resumo_distritos.py
-py -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+   - Windows (PowerShell): `winget install --id=astral-sh.uv -e`
+   - Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`, ou o pacote `uv` da distribuição
+
+3. Na raiz do projeto, em qualquer sistema:
+
+```bash
+uv sync
+uv run scripts/importar_distritos_sp.py
+uv run scripts/atualizar_resumo_distritos.py
+uv run uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
+
+`uv sync` instala o Python 3.12, se necessário, cria `.venv` e instala exatamente as versões de `uv.lock`, incluindo as ferramentas de teste. Não é preciso ativar o ambiente: `uv run` usa `.venv` automaticamente. Para adicionar uma biblioteca, use `uv add nome` (ou `uv add --dev nome` para uso exclusivo em testes) e versione `pyproject.toml` e `uv.lock` juntos.
 
 Abra http://127.0.0.1:8000. A API interativa está em http://127.0.0.1:8000/docs. Não envie senhas ao GitHub.
 
-### Linux
-
-Requer Python 3.12 ou superior com o módulo `venv` (em Debian e Ubuntu, instale `python3-venv`). Na raiz do projeto, depois de criar `.env` como no passo 1:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt -r requirements-web.txt
-python scripts/importar_distritos_sp.py
-python scripts/atualizar_resumo_distritos.py
-python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
-```
-
-A aplicação e as duas rotinas acima leem `.env` automaticamente. O importador `scripts/carregar_ssp.py` lê apenas variáveis de ambiente; exporte o conteúdo de `.env` na mesma sessão antes de usá-lo:
-
-```bash
-set -a; source .env; set +a
-```
-
-Em novas sessões do terminal, ative o ambiente novamente com `source .venv/bin/activate`.
+A aplicação e as duas rotinas acima leem `.env` automaticamente. O importador `scripts/carregar_ssp.py` lê apenas variáveis de ambiente; por isso, execute-o com `uv run --env-file .env`, como na seção [Dados](#dados).
 
 ## Banco para os demais integrantes
 
@@ -49,7 +35,7 @@ docker compose --env-file .env -f database/docker-compose.yml up -d
 
 No Linux, o mesmo comando funciona com Docker Engine e o plugin Compose (pacote `docker-compose-plugin` ou equivalente da distribuição), sem Docker Desktop. Se o usuário não pertencer ao grupo `docker`, prefixe o comando com `sudo`. Na primeira inicialização, o contêiner executa `database/schema.sql` automaticamente. Para um PostgreSQL instalado no sistema, com a extensão PostGIS, aplique o esquema com `psql "postgresql://usuario:senha@localhost:5432/banco" -f database/schema.sql`.
 
-Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `py scripts/importar_distritos_sp.py` e `py scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
+Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `uv run scripts/importar_distritos_sp.py` e `uv run scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
 
 ## Testes
 
@@ -85,13 +71,11 @@ Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (vali
 
 Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB por arquivo do GitHub. O banco local ocupa vários GB. Por isso, os arquivos e dumps não são versionados: o repositório inclui rotinas reproduzíveis para criação, importação e padronização. Execute `database/schema.sql` uma vez no banco vazio, configure DATABASE_URL e use:
 
-```powershell
-py scripts/carregar_ssp.py --diretorio "data/raw/Dados Segurança Publica/SSP.SP/CSV"
+```bash
+uv run --env-file .env scripts/carregar_ssp.py --diretorio "data/raw/Dados Segurança Publica/SSP.SP/CSV"
 ```
 
-No Linux, use `python` no lugar de `py`, com o ambiente ativado e `.env` exportado (ver [Linux](#linux)).
-
-O importador reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use scripts/padronizar_csvs_ssp.py com --origem e --destino. Saídas em data/processed não são versionadas.
+O importador reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use `uv run scripts/padronizar_csvs_ssp.py` com `--origem` e `--destino`. Saídas em data/processed não são versionadas.
 
 ## Interpretação
 
