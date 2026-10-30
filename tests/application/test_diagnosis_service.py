@@ -71,6 +71,9 @@ class FakeRepository:
     def cep_centroid(self, cep):
         return self.centroid
 
+    def data_sources(self):
+        return []
+
 
 class FakeCepLookup:
     def __init__(self, address):
@@ -97,14 +100,21 @@ def test_cep_with_coordinates_from_the_cep_service_is_used_directly():
 
 def test_fallback_geocoder_supplies_missing_coordinates():
     endereco = Address("01001000", "Praça da Sé", "Sé", "São Paulo", "3550308")
-    s = service(address=endereco, geocoders=[("vazio", lambda cep: None), ("reserva", lambda cep: (-23.5, -46.6))])
+    s = service(address=endereco, geocoders=[("vazio", lambda end: None), ("reserva", lambda end: (-23.5, -46.6))])
     assert s.diagnose_cep("01001000")["local"]["origem_coordenada"] == "reserva"
+
+
+def test_geocoders_receive_the_whole_address():
+    endereco = Address("04929000", "Avenida Nova Arcádia", "Alto da Riviera", "São Paulo", "3550308")
+    recebidos = []
+    service(address=endereco, geocoders=[("r", lambda end: recebidos.append(end) or (-23.69, -46.75))]).diagnose_cep("04929000")
+    assert recebidos == [endereco]
 
 
 def test_cep_without_any_coordinate_cannot_be_diagnosed():
     endereco = Address("01001000", "Praça da Sé", "Sé", "São Paulo", "3550308")
     with pytest.raises(LocationNotFoundError):
-        service(address=endereco, geocoders=[("vazio", lambda cep: None)]).diagnose_cep("01001000")
+        service(address=endereco, geocoders=[("vazio", lambda end: None)]).diagnose_cep("01001000")
 
 
 def test_cep_outside_the_city_returns_warning_without_diagnosis():
@@ -227,3 +237,31 @@ def test_group_below_minimum_shows_message_without_rate_or_trend():
     assert grupo["ocorrencias"] == 12
     assert grupo["taxa_100k_ano"] is None and grupo["tendencia"] is None
     assert grupo["mensagem"] == INSUFFICIENT_DATA_MESSAGE
+
+
+# --- mapa e fontes (RF12, RF13; RN11) ---------------------------------------
+
+from geohabita.domain.freshness import OUTDATED_MESSAGE  # noqa: E402
+
+
+def test_equipment_coordinates_reach_the_map():
+    perto = [NearbyEquipment("ponto_onibus", "Ponto", 120.0, -23.551, -46.634)]
+    bloco = service(FakeRepository(nearest=perto, within=perto)).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
+    assert bloco["entorno"]["mobilidade"][0]["latitude"] == -23.551
+    assert bloco["tipos"]["ponto_onibus"]["longitude"] == -46.634
+
+
+def test_sources_carry_reference_dates_and_outdated_flag():
+    fontes = [
+        {"fonte": "SSP-SP", "descricao": "ocorrências", "data_referencia": date(2025, 12, 31)},
+        {"fonte": "GeoSampa", "descricao": "equipamentos", "data_referencia": date(2023, 1, 10)},
+        {"fonte": "IBGE", "descricao": "população", "data_referencia": date(2022, 8, 1), "periodicidade": "decenal"},
+    ]
+    repo = FakeRepository()
+    repo.data_sources = lambda: fontes
+    resultado = service(repo).diagnose_point(-23.55, -46.63)
+    por_fonte = {f["fonte"]: f for f in resultado["fontes"]}
+    assert por_fonte["SSP-SP"]["aviso"] is None
+    assert por_fonte["GeoSampa"]["aviso"] == OUTDATED_MESSAGE  # mais de 24 meses (RN11)
+    assert por_fonte["IBGE"]["aviso"] is None  # censo decenal: a regra não se aplica
+    assert por_fonte["SSP-SP"]["data_referencia"] == "2025-12-31"

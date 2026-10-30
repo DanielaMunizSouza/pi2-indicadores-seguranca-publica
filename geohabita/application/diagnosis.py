@@ -18,6 +18,7 @@ from typing import Any, Protocol
 
 from geohabita.application.cep_lookup import Address
 from geohabita.domain.diagnosis import build_diagnosis
+from geohabita.domain.freshness import OUTDATED_MESSAGE, is_outdated
 from geohabita.domain.equipment import (
     EQUIPMENT_CATEGORY,
     LISTING_RADII_M,
@@ -57,7 +58,7 @@ OCCURRENCE_NOTE = (
     "taxa à parte: o roubo de celular também está incluído em roubo."
 )
 
-Geocoder = Callable[[str], "tuple[float, float] | None"]
+Geocoder = Callable[[Address], "tuple[float, float] | None"]
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class DiagnosisRepository(Protocol):
                          types: Sequence[str]) -> list[NearbyEquipment]: ...
     def district_indicators(self) -> Mapping[str, Mapping[tuple[str, str, int], float]]: ...
     def populations(self) -> Mapping[str, int]: ...
+    def data_sources(self) -> list[dict[str, Any]]: ...
 
 
 class CepLookupLike(Protocol):
@@ -131,7 +133,7 @@ class DiagnosisService:
         if address.latitude is not None and address.longitude is not None:
             return address.latitude, address.longitude, "servico_cep"
         for name, geocode in self.geocoders:
-            point = geocode(address.cep)
+            point = geocode(address)
             if point is not None:
                 return point[0], point[1], name
         raise LocationNotFoundError("Não foi possível obter a localização deste CEP.")
@@ -149,7 +151,20 @@ class DiagnosisService:
             self.occurrences(district.code, indicators),
         )
         return {"local": local, "dentro_sao_paulo": True, "aviso": None, "pesos": pesos,
-                "diagnostico": diagnostico}
+                "diagnostico": diagnostico, "fontes": self.sources()}
+
+    # --- fontes e datas de referência (RF12; RN11) ----------------------------
+    def sources(self) -> list[dict[str, Any]]:
+        fontes = []
+        for fonte in self.repository.data_sources():
+            referencia = fonte.get("data_referencia")
+            # A população vem do censo, decenal: a regra dos 24 meses não se aplica a ela.
+            verificar = referencia is not None and fonte.get("periodicidade") != "decenal"
+            fontes.append(fonte | {
+                "data_referencia": referencia.isoformat() if referencia else None,
+                "aviso": OUTDATED_MESSAGE if verificar and is_outdated(referencia, self.today()) else None,
+            })
+        return fontes
 
     # --- bloco 1: proximidade (RF07, RF23, RF24) -----------------------------
     def proximity(self, latitude: float, longitude: float, pesos: Mapping[str, int]) -> dict[str, Any]:
@@ -162,6 +177,7 @@ class DiagnosisService:
                                     "ideal_m": limiar.ideal_m, "maxima_m": limiar.max_m}
             if tipo not in available:
                 tipos[tipo] = info | {"nota": None, "distancia_m": None, "nome": None,
+                                      "latitude": None, "longitude": None,
                                       "tempo_caminhada_min": None, "ate_500m": None, "ate_1km": None,
                                       "aviso": UNAVAILABLE_LAYER_MESSAGE}
                 continue
@@ -173,6 +189,8 @@ class DiagnosisService:
                 "nota": round(nota, 1),
                 "distancia_m": distancia,
                 "nome": mais_proximo.name if mais_proximo else None,
+                "latitude": mais_proximo.latitude if mais_proximo else None,
+                "longitude": mais_proximo.longitude if mais_proximo else None,
                 "tempo_caminhada_min": walking_time_minutes(distancia) if distancia is not None else None,
                 "ate_500m": sum(1 for e in around if e.type == tipo and e.distance_m <= 500),
                 "ate_1km": sum(1 for e in around if e.type == tipo and e.distance_m <= 1000),
@@ -192,7 +210,8 @@ class DiagnosisService:
         incluidas = [c for c in CATEGORIES if categorias[c]["nota"] is not None]
         ipl = local_proximity_index(notas, pesos_ipl) if sum(pesos_ipl) else None
         entorno = {
-            categoria: [{"tipo": e.type, "nome": e.name, "distancia_m": round(e.distance_m, 1)} for e in itens]
+            categoria: [{"tipo": e.type, "nome": e.name, "distancia_m": round(e.distance_m, 1),
+                         "latitude": e.latitude, "longitude": e.longitude} for e in itens]
             for categoria, itens in within_radius(around, max(LISTING_RADII_M)).items()
         }
         return {"ipl": round(ipl, 1) if ipl is not None else None, "medida": STRAIGHT_LINE_LABEL,
