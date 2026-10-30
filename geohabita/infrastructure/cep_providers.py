@@ -16,6 +16,7 @@ from geohabita.domain.territory import SAO_PAULO_IBGE_CODE
 
 VIACEP_URL = "https://viacep.com.br/ws/{cep}/json/"
 BRASILAPI_URL = "https://brasilapi.com.br/api/cep/v2/{cep}"
+SAO_PAULO_CITY_CENTRE = (-23.5475, -46.63611)  # coordenada genérica devolvida pela BrasilAPI
 _HEADERS = {"User-Agent": "GeoHabita/0.1 (projeto integrador UNIVESP)"}
 
 
@@ -89,5 +90,10 @@ def brasilapi_coordinates(cep: str, timeout: float = 3.0) -> tuple[float, float]
     except ProviderError:
         return None
     if address is None or address.latitude is None or address.longitude is None:
+        return None
+    # Sem a posição do CEP, a BrasilAPI devolve o centro do município, que no
+    # diagnóstico cairia sempre no distrito da Sé: essa coordenada é descartada.
+    if (abs(address.latitude - SAO_PAULO_CITY_CENTRE[0]) < 1e-4
+            and abs(address.longitude - SAO_PAULO_CITY_CENTRE[1]) < 1e-4):
         return None
     return address.latitude, address.longitude
