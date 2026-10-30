@@ -61,3 +61,14 @@ CREATE OR REPLACE VIEW public.vw_resumo_cep AS
  SELECT municipio,cep,categoria_dado,count(*) AS registros,min(data_ocorrencia) AS primeira_data,max(data_ocorrencia) AS ultima_data,
  avg(latitude) FILTER(WHERE localizacao IS NOT NULL) AS latitude_media,avg(longitude) FILTER(WHERE localizacao IS NOT NULL) AS longitude_media
  FROM public.registro_ocorrencia WHERE cep IS NOT NULL GROUP BY 1,2,3;
+ALTER TABLE public.distrito_municipal_sp ADD COLUMN IF NOT EXISTS populacao_2022 integer;
+CREATE TABLE IF NOT EXISTS public.equipamento_publico (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ categoria text NOT NULL, tipo text NOT NULL, camada text NOT NULL, identificador text NOT NULL,
+ nome text, endereco text, cep varchar(8),
+ geometria geometry(Geometry,4326) NOT NULL,
+ importado_em timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT uq_equipamento_origem UNIQUE(camada,identificador)
+);
+CREATE INDEX IF NOT EXISTS ix_equipamento_geometria ON public.equipamento_publico USING gist(geometria);
+CREATE INDEX IF NOT EXISTS ix_equipamento_categoria_tipo ON public.equipamento_publico(categoria,tipo);
