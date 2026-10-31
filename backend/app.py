@@ -15,7 +15,7 @@ if _env_file.is_file():
         if _sep and _key.strip() and not _key.lstrip().startswith("#"):
             os.environ.setdefault(_key.strip(), _value.strip().strip("\"'").strip())
 DB_URL=os.getenv("DATABASE_URL","postgresql://postgres@localhost:5432/ProjetoIntergrador_2")
-MUNICIPIOS_SP=["S.PAULO","SAO PAULO","SÃO PAULO"]
+MUNICIPIOS_SP=["São Paulo","S.PAULO","SAO PAULO","SÃO PAULO"]  # "São Paulo" é a forma gravada pelo importador
 CATEGORIES={"objetos":"Objetos","celulares_subtraidos":"Celulares subtraídos","apreensao_entorpecente":"Apreensão de entorpecentes","entorpecentes_gramas":"Entorpecentes (gramas)","veiculos":"Veículos subtraídos","veiculos_recuperados":"Veículos recuperados","criminal":"Dados criminais (SPDados)","mdip":"Mortes decorrentes de intervenção policial","prisoes":"Prisões efetuadas","presos_apreendidos":"Presos e apreendidos","armas_apreendidas":"Armas de fogo apreendidas","flagrantes":"Flagrantes lavrados","apreensao_eca":"Apreensões (art. 173 ECA)","outros":"Outros"}
 app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1.0.0",description="Resumos agregados por período, categoria e localização.")
 
