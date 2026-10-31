@@ -18,7 +18,7 @@ uv run --env-file .env scripts/pipeline_dados.py   # popula o banco (veja a seç
 uv run uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
-O banco precisa existir e ter o esquema aplicado antes do pipeline (seção seguinte). A primeira execução baixa vários GB e leva um bom tempo.
+O banco precisa existir e ter o esquema aplicado antes do pipeline (seção seguinte). A primeira execução baixa cerca de 1,5 GB (GeoSampa e SSP) e leva por volta de meia hora a uma hora, conforme a conexão; as seguintes só baixam o que mudou.
 
 `uv sync` instala o Python 3.12, se necessário, cria `.venv` e instala exatamente as versões de `uv.lock`, incluindo as ferramentas de teste. Não é preciso ativar o ambiente: `uv run` usa `.venv` automaticamente. Para adicionar uma biblioteca, use `uv add nome` (ou `uv add --dev nome` para uso exclusivo em testes) e versione `pyproject.toml` e `uv.lock` juntos.
 
@@ -70,13 +70,13 @@ Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (vali
 
 ## Dados
 
-As bases da SSP-SP somam vários GB (alguns XLSX passam de 400 MB) e o banco local ocupa vários GB, então nada disso é versionado: o repositório traz o pipeline que baixa, converte e importa tudo. Com o esquema aplicado e `DATABASE_URL` no `.env`:
+As bases baixadas e o banco local ocupam alguns GB, então nada disso é versionado: o repositório traz o pipeline que baixa, converte e importa tudo. Com o esquema aplicado e `DATABASE_URL` no `.env`:
 
 ```bash
 uv run --env-file .env scripts/pipeline_dados.py
 ```
 
-Sem argumentos, ele executa tudo, nesta ordem: importação dos distritos (a partir de `data/reference/`), download e carga dos equipamentos públicos do GeoSampa, população por distrito (Censo 2022, IBGE), download, conversão e importação das bases da SSP-SP e resumos do mapa. Só passar `--etapas` restringe a ingestão (por exemplo `--etapas ssp-baixar ssp-carregar resumo` para atualizar só a SSP). O que já está em dia não é baixado de novo. As fontes, os padrões de URL, as categorias e os cuidados com os dados estão em [`data/README.md`](data/README.md).
+Sem argumentos, ele executa tudo: distritos (a partir de `data/reference/`), equipamentos públicos do GeoSampa, população por distrito (Censo 2022, IBGE), bases da SSP-SP e resumos do mapa. As etapas independentes rodam em paralelo, com barra de progresso no terminal ou linhas de log com horário quando a saída vai para arquivo. Da SSP, o padrão é o que os indicadores usam: dados criminais, celulares subtraídos e mortes por intervenção policial, nos três últimos anos completos, só do município de São Paulo. `--etapas` restringe as etapas, `--fontes`/`--desde`/`--todo-estado` ampliam o escopo da SSP e `--workers` ajusta o paralelismo. O que já está em dia não é baixado nem recarregado. As fontes, as opções e os cuidados com os dados estão em [`data/README.md`](data/README.md).
 
 O importador `scripts/carregar_ssp.py` reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para usar CSVs que você já baixou manualmente, execute `uv run --env-file .env scripts/carregar_ssp.py --diretorio <pasta>`. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use `uv run scripts/padronizar_csvs_ssp.py` com `--origem` e `--destino`. Saídas em `data/raw` e `data/processed` não são versionadas.
 
