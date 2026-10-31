@@ -38,4 +38,4 @@ Cuidados com os dados:
 
 ### Outras fontes
 
-A população por distrito (Censo 2022, IBGE) entra com `--etapas ibge-populacao --populacao-csv arquivo.csv` (colunas `codigo_distrito;populacao`), pois o IBGE não publica esse total por distrito em tabela pronta: some os setores censitários. O modelo de dados está em `database/modelo_er.mmd`, com a comparação com o relatório em `database/modelo_er.md`.
+A população por distrito vem do arquivo `Agregados_por_distritos_basico_BR` do Censo 2022 (variável `v0001`, população residente), baixado de `ftp.ibge.gov.br` para `data/raw/ibge/` e associado aos distritos do GeoSampa pelo nome, sem acento. Os 96 distritos casam e o total de São Paulo é 11.451.999. As camadas do GeoSampa que o servidor deles recusa (hoje `GEOSAMPA_cadparcs_parque_unidade_conservacao` e a de praças) são puladas com aviso. A camada de iluminação pública tem cerca de 663 mil pontos e leva alguns minutos. O modelo de dados está em `database/modelo_er.mmd`, com a comparação com o relatório em `database/modelo_er.md`.
