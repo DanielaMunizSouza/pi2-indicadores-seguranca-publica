@@ -1,0 +1,78 @@
+%% Modelo de dados implementado (database/schema.sql). Renderizar: mmdc -i modelo_er.mmd -o modelo_er.png
+%%{init: {'theme':'neutral'}}%%
+erDiagram
+    DISTRITO_MUNICIPAL_SP ||--o{ RESUMO_DISTRITO_DIARIO : "agrega"
+    DISTRITO_MUNICIPAL_SP ||..o{ REGISTRO_OCORRENCIA : "contém (ST_Within)"
+    DISTRITO_MUNICIPAL_SP ||..o{ EQUIPAMENTO_PUBLICO : "contém (ST_Within)"
+    CARGA_ETL ||..o{ REGISTRO_OCORRENCIA : "importa (arquivo)"
+    REGISTRO_OCORRENCIA }o..o{ RESUMO_OCORRENCIA_DIARIO : "resume"
+
+    DISTRITO_MUNICIPAL_SP {
+        text codigo_distrito PK
+        text nome_distrito
+        text regiao
+        date atualizado_em
+        int populacao_2022
+        multipolygon geometria
+    }
+    REGISTRO_OCORRENCIA {
+        bigint id PK
+        text arquivo_origem "UK com linha_origem"
+        bigint linha_origem
+        text categoria_dado "objetos, veiculos, mdip, criminal..."
+        text municipio
+        smallint ano_bo
+        text num_bo
+        text id_delegacia
+        text cod_ibge
+        date data_ocorrencia
+        time hora_ocorrencia
+        varchar cep
+        text bairro
+        text logradouro
+        text natureza
+        text rubrica
+        text tipo_objeto
+        text tipo_local
+        numeric quantidade
+        double latitude
+        double longitude
+        point localizacao "gerada de lat/lon"
+        jsonb dados_originais "colunas extras; sem dados pessoais"
+    }
+    EQUIPAMENTO_PUBLICO {
+        bigint id PK
+        text categoria "6 categorias do IVEP"
+        text tipo "chave de thresholds.py"
+        text camada "camada GeoSampa"
+        text identificador "UK com camada"
+        text nome
+        text endereco
+        varchar cep
+        geometry geometria
+    }
+    CARGA_ETL {
+        bigint id PK
+        text fonte
+        text arquivo
+        text categoria
+        timestamptz executada_em
+        bigint registros_importados
+        bigint registros_sem_coordenada
+        text situacao
+    }
+    RESUMO_DISTRITO_DIARIO {
+        text codigo_distrito PK
+        date data_ocorrencia PK
+        text categoria_dado PK
+        varchar cep PK
+        bigint registros
+    }
+    RESUMO_OCORRENCIA_DIARIO {
+        date data_ocorrencia PK
+        text categoria_dado PK
+        varchar cep PK
+        bigint registros
+        bigint com_cep
+        bigint com_coordenada
+    }
