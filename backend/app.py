@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 from pathlib import Path
@@ -11,6 +12,7 @@ from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE,OUT_OF_CITY_MESSAGE,is_sao_paulo
 from geohabita.application.diagnosis import DiagnosisService,LocationNotFoundError
 from geohabita.infrastructure.cep_providers import brasilapi,brasilapi_coordinates,viacep
+from geohabita.infrastructure.nominatim import NominatimGeocoder
 from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -59,7 +61,10 @@ def make_where(start,end,cep,category,include_city=True):
     return " AND ".join(clauses),values
 
 @app.get("/",include_in_schema=False)
-def home(): return FileResponse(ROOT/"frontend"/"index.html")
+def home(): return FileResponse(ROOT/"frontend"/"diagnostico.html")
+
+@app.get("/explorar",include_in_schema=False)
+def explorar(): return FileResponse(ROOT/"frontend"/"explorar.html")
 
 @app.get("/api/status")
 def status():
@@ -82,11 +87,14 @@ def cep_address(cep:str):
       "latitude":address.latitude,"longitude":address.longitude,"nota_localizacao":APPROXIMATE_LOCATION_NOTICE}
 
 # Diagnóstico socioespacial (UC02): proximidade e IPL, vitalidade e IVEP, ocorrências.
-# O ViaCEP não traz coordenadas: elas vêm da BrasilAPI ou, na falta, da mediana das
-# coordenadas das ocorrências registradas com o mesmo CEP.
+# O ViaCEP não traz coordenadas: elas vêm dos geocodificadores abaixo, em ordem.
 diagnosis_repository=PostgisDiagnosisRepository(connect)
+# Ordem: coordenada específica da BrasilAPI; mediana das ocorrências com o mesmo CEP;
+# logradouro no Nominatim (OpenStreetMap).
 diagnosis_service=DiagnosisService(diagnosis_repository,cep_service,geocoders=[
-    ("brasilapi",brasilapi_coordinates),("registros_ssp",diagnosis_repository.cep_centroid)])
+    ("brasilapi",lambda endereco: brasilapi_coordinates(endereco.cep)),
+    ("registros_ssp",lambda endereco: diagnosis_repository.cep_centroid(endereco.cep,endereco.street)),
+    ("openstreetmap",NominatimGeocoder())])
 def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetros os confunde
     return Query(1,ge=0,le=5,description="Peso da categoria, inteiro de 0 a 5 (RN06).")
 
@@ -112,6 +120,16 @@ def diagnostico(cep:str|None=Query(None,description="CEP do endereço (8 dígito
 
 @app.get("/api/categories")
 def categories(): return [{"value":k,"label":v} for k,v in CATEGORIES.items()]
+
+@app.get("/api/distritos/{codigo}/limite",include_in_schema=False)
+def district_boundary(codigo:str):
+    """Limite de um distrito em GeoJSON, simplificado (~5 m) para o mapa do diagnóstico."""
+    with connect() as conn:
+        row=conn.execute("""SELECT nome_distrito,ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometria,0.00005),6) AS g
+            FROM public.distrito_municipal_sp WHERE codigo_distrito=%s""",(codigo,)).fetchone()
+    if not row: raise HTTPException(404,"Distrito não encontrado.")
+    return JSONResponse({"type":"Feature","properties":{"codigo":codigo,"nome":row["nome_distrito"]},
+                         "geometry":json.loads(row["g"])},media_type="application/geo+json")
 
 @app.get("/api/areas/geometry",include_in_schema=False)
 def area_geometry():
