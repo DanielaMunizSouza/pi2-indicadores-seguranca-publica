@@ -61,3 +61,25 @@ CREATE OR REPLACE VIEW public.vw_resumo_cep AS
  SELECT municipio,cep,categoria_dado,count(*) AS registros,min(data_ocorrencia) AS primeira_data,max(data_ocorrencia) AS ultima_data,
  avg(latitude) FILTER(WHERE localizacao IS NOT NULL) AS latitude_media,avg(longitude) FILTER(WHERE localizacao IS NOT NULL) AS longitude_media
  FROM public.registro_ocorrencia WHERE cep IS NOT NULL GROUP BY 1,2,3;
+ALTER TABLE public.distrito_municipal_sp ADD COLUMN IF NOT EXISTS populacao_2022 integer;
+CREATE TABLE IF NOT EXISTS public.equipamento_publico (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ categoria text NOT NULL, tipo text NOT NULL, camada text NOT NULL, identificador text NOT NULL,
+ nome text, endereco text, cep varchar(8),
+ geometria geometry(Geometry,4326) NOT NULL,
+ importado_em timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT uq_equipamento_origem UNIQUE(camada,identificador)
+);
+CREATE INDEX IF NOT EXISTS ix_equipamento_geometria ON public.equipamento_publico USING gist(geometria);
+CREATE INDEX IF NOT EXISTS ix_equipamento_categoria_tipo ON public.equipamento_publico(categoria,tipo);
+ALTER TABLE public.registro_ocorrencia
+ ADD COLUMN IF NOT EXISTS num_bo text, ADD COLUMN IF NOT EXISTS id_delegacia text, ADD COLUMN IF NOT EXISTS cod_ibge text;
+CREATE INDEX IF NOT EXISTS ix_registro_bo ON public.registro_ocorrencia(ano_bo,num_bo,id_delegacia);
+CREATE TABLE IF NOT EXISTS public.carga_etl (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ fonte text NOT NULL, arquivo text NOT NULL, categoria text,
+ executada_em timestamptz NOT NULL DEFAULT now(),
+ registros_importados bigint NOT NULL DEFAULT 0, registros_sem_coordenada bigint NOT NULL DEFAULT 0,
+ situacao text NOT NULL DEFAULT 'concluida'
+);
+CREATE INDEX IF NOT EXISTS ix_carga_arquivo ON public.carga_etl(arquivo,executada_em DESC);

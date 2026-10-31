@@ -14,16 +14,17 @@ Aplicação web para explorar registros públicos SSP-SP por CEP, categoria, per
 
 ```bash
 uv sync
-uv run scripts/importar_distritos_sp.py
-uv run scripts/atualizar_resumo_distritos.py
+uv run --env-file .env scripts/pipeline_dados.py   # popula o banco (veja a seção Dados)
 uv run uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
+
+O banco precisa existir e ter o esquema aplicado antes do pipeline (seção seguinte). A primeira execução baixa vários GB e leva um bom tempo.
 
 `uv sync` instala o Python 3.12, se necessário, cria `.venv` e instala exatamente as versões de `uv.lock`, incluindo as ferramentas de teste. Não é preciso ativar o ambiente: `uv run` usa `.venv` automaticamente. Para adicionar uma biblioteca, use `uv add nome` (ou `uv add --dev nome` para uso exclusivo em testes) e versione `pyproject.toml` e `uv.lock` juntos.
 
 Abra http://127.0.0.1:8000. A API interativa está em http://127.0.0.1:8000/docs. Não envie senhas ao GitHub.
 
-A aplicação e as duas rotinas acima leem `.env` automaticamente. O importador `scripts/carregar_ssp.py` lê apenas variáveis de ambiente; por isso, execute-o com `uv run --env-file .env`, como na seção [Dados](#dados).
+A aplicação lê `.env` automaticamente. O pipeline e o importador `scripts/carregar_ssp.py` leem apenas variáveis de ambiente; por isso, execute-os com `uv run --env-file .env`, como na seção [Dados](#dados).
 
 ## Banco para os demais integrantes
 
@@ -35,7 +36,7 @@ docker compose --env-file .env -f database/docker-compose.yml up -d
 
 No Linux, o mesmo comando funciona com Docker Engine e o plugin Compose (pacote `docker-compose-plugin` ou equivalente da distribuição), sem Docker Desktop. Se o usuário não pertencer ao grupo `docker`, prefixe o comando com `sudo`. Na primeira inicialização, o contêiner executa `database/schema.sql` automaticamente. Para um PostgreSQL instalado no sistema, com a extensão PostGIS, aplique o esquema com `psql "postgresql://usuario:senha@localhost:5432/banco" -f database/schema.sql`.
 
-Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Após executar `database/schema.sql` e importar os CSVs conforme `data/README.md`, rode `uv run scripts/importar_distritos_sp.py` e `uv run scripts/atualizar_resumo_distritos.py`. A segunda rotina cria a agregação diária usada pela interface; execute-a novamente após novos CSVs.
+Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Depois de aplicar `database/schema.sql`, rode `uv run --env-file .env scripts/pipeline_dados.py`, que baixa e importa as fontes públicas e gera a agregação diária usada pela interface (detalhes na seção Dados). Quem já tem um banco criado antes pode reaplicar `database/schema.sql` com segurança: o arquivo é idempotente e só acrescenta as tabelas e colunas novas. O modelo de dados está em `database/modelo_er.mmd`.
 
 ## Testes
 
@@ -69,13 +70,15 @@ Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (vali
 
 ## Dados
 
-Os CSVs disponíveis somam cerca de 959 MB, alguns excedem o limite de 100 MB por arquivo do GitHub. O banco local ocupa vários GB. Por isso, os arquivos e dumps não são versionados: o repositório inclui rotinas reproduzíveis para criação, importação e padronização. Execute `database/schema.sql` uma vez no banco vazio, configure DATABASE_URL e use:
+As bases da SSP-SP somam vários GB (alguns XLSX passam de 400 MB) e o banco local ocupa vários GB, então nada disso é versionado: o repositório traz o pipeline que baixa, converte e importa tudo. Com o esquema aplicado e `DATABASE_URL` no `.env`:
 
 ```bash
-uv run --env-file .env scripts/carregar_ssp.py --diretorio "data/raw/Dados Segurança Publica/SSP.SP/CSV"
+uv run --env-file .env scripts/pipeline_dados.py
 ```
 
-O importador reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use `uv run scripts/padronizar_csvs_ssp.py` com `--origem` e `--destino`. Saídas em data/processed não são versionadas.
+Ele executa, em ordem: download das camadas de equipamentos públicos do GeoSampa, importação dos distritos (a partir de `data/reference/`) e dos equipamentos, bases da SSP-SP (download dos XLSX, conversão em CSV e importação) e resumos do mapa. Cada etapa pode ser executada isoladamente com `--etapas` (por exemplo `--etapas ssp-baixar ssp-carregar resumo` para atualizar só a SSP) e o que já está em dia não é baixado de novo. A população por distrito (IBGE) é uma etapa à parte, com CSV informado por você. As fontes, os padrões de URL, as categorias e os cuidados com os dados estão em [`data/README.md`](data/README.md).
+
+O importador `scripts/carregar_ssp.py` reprocessa cada arquivo em transação, sem alterar os originais, e mantém colunas heterogêneas em JSONB. Para usar CSVs que você já baixou manualmente, execute `uv run --env-file .env scripts/carregar_ssp.py --diretorio <pasta>`. Para criar cópias com as colunas da referência OBJETOS_01_TRIM_2025.csv, use `uv run scripts/padronizar_csvs_ssp.py` com `--origem` e `--destino`. Saídas em `data/raw` e `data/processed` não são versionadas.
 
 ## Interpretação
 
