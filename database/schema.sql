@@ -72,3 +72,14 @@ CREATE TABLE IF NOT EXISTS public.equipamento_publico (
 );
 CREATE INDEX IF NOT EXISTS ix_equipamento_geometria ON public.equipamento_publico USING gist(geometria);
 CREATE INDEX IF NOT EXISTS ix_equipamento_categoria_tipo ON public.equipamento_publico(categoria,tipo);
+ALTER TABLE public.registro_ocorrencia
+ ADD COLUMN IF NOT EXISTS num_bo text, ADD COLUMN IF NOT EXISTS id_delegacia text, ADD COLUMN IF NOT EXISTS cod_ibge text;
+CREATE INDEX IF NOT EXISTS ix_registro_bo ON public.registro_ocorrencia(ano_bo,num_bo,id_delegacia);
+CREATE TABLE IF NOT EXISTS public.carga_etl (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ fonte text NOT NULL, arquivo text NOT NULL, categoria text,
+ executada_em timestamptz NOT NULL DEFAULT now(),
+ registros_importados bigint NOT NULL DEFAULT 0, registros_sem_coordenada bigint NOT NULL DEFAULT 0,
+ situacao text NOT NULL DEFAULT 'concluida'
+);
+CREATE INDEX IF NOT EXISTS ix_carga_arquivo ON public.carga_etl(arquivo,executada_em DESC);
