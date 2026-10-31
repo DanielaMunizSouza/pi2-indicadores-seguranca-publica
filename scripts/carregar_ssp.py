@@ -1,15 +1,22 @@
 import argparse
 import csv
 import getpass
+import hashlib
 import json
 import os
 import re
+import sys
+import unicodedata
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import psycopg
 from psycopg.types.json import Jsonb
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from progresso import Progresso, ProgressoRemoto  # noqa: E402
 
 COLUMNS = [
     'arquivo_origem','linha_origem','categoria_dado','municipio','ano_bo',
@@ -76,8 +83,8 @@ def parsed_coord(value, low, high):
 
 
 def valid_point(lat, lon):
-    """A SSP grava 0,0 quando não há coordenada; isso cairia no oceano e não é localização."""
-    if lat is None or lon is None or (lat == 0 and lon == 0):
+    """A SSP grava 0 quando não há coordenada; no estado de SP nenhuma coordenada válida é 0."""
+    if lat is None or lon is None or lat == 0 or lon == 0:
         return None, None
     return lat, lon
 
@@ -98,7 +105,8 @@ def clean_cep(value):
 def clean_municipio(value):
     if not value:
         return None
-    normalized = re.sub(r'[^A-Z]', '', value.upper())
+    sem_acento = ''.join(c for c in unicodedata.normalize('NFD', value.upper()) if unicodedata.category(c) != 'Mn')
+    normalized = re.sub(r'[^A-Z]', '', sem_acento)
     if normalized in ('SAOPAULO', 'SPAULO'):  # a SSP abrevia como 'S.PAULO'
         return 'São Paulo'
     return value
@@ -119,6 +127,17 @@ CATEGORIAS = [  # ordem importa: o primeiro trecho encontrado no nome do arquivo
     ('SPDADOSCRIMINAIS', 'criminal'),
     ('OBJETOS', 'objetos'),
 ]
+
+
+def municipio_do_fato(row):
+    """Município onde ocorreu o fato: código IBGE quando existe, senão o da circunscrição.
+    NOME_MUNICIPIO é onde o BO foi registrado, que pode ser outra cidade."""
+    ibge = (first(row, 'CD_IBGE', 'COD IBGE', 'COD_IBGE') or '').split('.')[0]
+    if ibge == '3550308':
+        return 'São Paulo'
+    return clean_municipio(first(row, 'NOME_MUNICIPIO_CIRC', 'NOME_MUNICIPIO_CIRCUNSCRICAO',
+                                 'NOME_MUNICIPIO_CIRCUNCRIÇÃO', 'MUNICIPIO_CIRCUNSCRICAO',
+                                 'NOME_MUNICIPIO', 'CIDADE'))
 
 
 def category(filename):
@@ -156,7 +175,7 @@ def make_record(path, line_number, row):
                            parsed_coord(first(row, 'LONGITUDE'), -180, 180))
     return (
         path.name, line_number, kind,
-        clean_municipio(first(row, 'NOME_MUNICIPIO', 'CIDADE', 'NOME_MUNICIPIO_CIRC', 'NOME_MUNICIPIO_CIRCUNSCRICAO', 'MUNICIPIO_CIRCUNSCRICAO')),
+        municipio_do_fato(row),
         year, date, parsed_time(first(row, 'HORA_OCORRENCIA', 'HORA_OCORRENCIA_BO', 'HORA_FATO')),
         clean_cep(first(row, 'CEP')),
         first(row, 'BAIRRO'), hidden_address(first(row, 'LOGRADOURO', 'LOGRADOURO_VERSAO')),
@@ -171,46 +190,140 @@ def make_record(path, line_number, row):
     )
 
 
+# Arquivos gerados por scripts/baixar_ssp.py: <Fonte>_<ano>[__<aba>].csv
+ARQUIVO_DO_PIPELINE = re.compile(r'^(SPDadosCriminais|CelularesSubtraidos|VeiculosSubtraidos|ObjetosSubtraidos|'
+                                 r'DadosProdutividade|MDIP)_\d{4}(__.*)?\.csv$')
+
+
+def assinatura(path):
+    """Hash do conteúdo: um CSV reconvertido com o mesmo conteúdo não é recarregado
+    (recarregar custa caro: DELETE de centenas de milhares de linhas + COPY)."""
+    with path.open('rb') as f:
+        return 'sha1:' + hashlib.file_digest(f, 'sha1').hexdigest()
+
+
+def assinatura_antiga(path):  # formato usado antes do hash; aceito para não recarregar tudo uma vez
+    st = path.stat()
+    return f'{st.st_size}:{st.st_mtime_ns}'
+
+
+def carregar_arquivo(path, dsn, fila=None, refazer=False):
+    """Carrega um CSV em uma transação própria (DELETE + COPY + carga_etl). Roda em processo filho.
+    Retorna (registros, pulado)."""
+    path = Path(path)
+    progresso = ProgressoRemoto(fila) if fila is not None else None
+    sig = assinatura(path)
+    with psycopg.connect(dsn) as conn:
+        if not refazer:
+            ultima = conn.execute('SELECT assinatura, registros_importados FROM public.carga_etl '
+                                  'WHERE arquivo = %s ORDER BY executada_em DESC LIMIT 1', (path.name,)).fetchone()
+            if ultima and ultima[0] in (sig, assinatura_antiga(path)):
+                return ultima[1], True
+        chave = f'load:{path.name}'
+        tamanho = path.stat().st_size
+        if progresso:
+            progresso.inicio(chave, f'carregando {path.stem}', total=tamanho)
+        count = 0
+        with conn.transaction():
+            conn.execute('DELETE FROM public.registro_ocorrencia WHERE arquivo_origem = %s', (path.name,))
+            with path.open('r', encoding='utf-8-sig', newline='') as source:
+                reader = csv.DictReader(source, delimiter=';')
+                if not reader.fieldnames:
+                    raise ValueError(f'Arquivo sem cabeçalho: {path.name}')
+                with conn.cursor().copy(COPY_SQL) as copy:
+                    for line_number, row in enumerate(reader, start=2):
+                        copy.write_row(make_record(path, line_number, row))
+                        count += 1
+                        if progresso and count % 20000 == 0:
+                            progresso.avanco(chave, feito=source.buffer.tell())
+            no_point = conn.execute(
+                'SELECT count(*) FROM public.registro_ocorrencia WHERE arquivo_origem = %s AND localizacao IS NULL',
+                (path.name,)).fetchone()[0]
+            conn.execute(
+                'INSERT INTO public.carga_etl (fonte, arquivo, categoria, registros_importados, '
+                'registros_sem_coordenada, assinatura) VALUES (%s, %s, %s, %s, %s, %s)',
+                ('ssp-sp', path.name, category(path.name), count, no_point, sig))
+        if progresso:
+            progresso.fim(chave, f'{path.name}: {count:,} registros')
+    return count, False
+
+
+def sincronizar(dsn, ativos, progresso):
+    """Remove do banco os arquivos do pipeline que saíram do escopo (outras fontes/anos)."""
+    with psycopg.connect(dsn) as conn:
+        presentes = [r[0] for r in conn.execute('SELECT DISTINCT arquivo FROM public.carga_etl')]
+        fora = [a for a in presentes if ARQUIVO_DO_PIPELINE.match(a) and a not in ativos]
+        for arquivo in fora:
+            with conn.transaction():
+                n = conn.execute('DELETE FROM public.registro_ocorrencia WHERE arquivo_origem = %s',
+                                 (arquivo,)).rowcount
+                conn.execute('DELETE FROM public.carga_etl WHERE arquivo = %s', (arquivo,))
+            progresso.log(f'  removido do banco (fora do escopo): {arquivo} ({n:,} registros)')
+
+
+def carregar(files, dsn, progresso, workers=2, refazer=False):
+    total, falhas = 0, []
+    fila = progresso.fila() if hasattr(progresso, 'fila') else None
+    with ProcessPoolExecutor(workers) as pool:
+        tarefas = {pool.submit(carregar_arquivo, str(f), dsn, fila, refazer): f
+                   for f in sorted(files, key=lambda f: -f.stat().st_size)}  # maiores primeiro
+        for t in as_completed(tarefas):
+            f = tarefas[t]
+            try:
+                count, pulado = t.result()
+            except Exception as erro:
+                progresso.log(f'✖ {f.name}: {erro}')
+                falhas.append(f.name)
+                continue
+            total += count
+            if pulado:
+                progresso.log(f'  {f.name}: sem mudanças desde a última carga ({count:,} registros)')
+    return total, falhas
+
+
+def conexao(dsn):
+    if dsn:
+        return dsn
+    password = os.getenv('PGPASSWORD') or getpass.getpass('Senha do PostgreSQL: ')
+    return psycopg.conninfo.make_conninfo(
+        host=os.getenv('PGHOST', 'localhost'), port=os.getenv('PGPORT', '5432'),
+        dbname=os.getenv('PGDATABASE', 'pi2_seguranca_publica'), user=os.getenv('PGUSER', 'postgres'),
+        password=password)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Carrega os CSVs SSP em PostgreSQL/PostGIS.')
-    parser.add_argument('--diretorio', required=True, help='Pasta contendo os arquivos CSV fonte.')
+    origem = parser.add_mutually_exclusive_group(required=True)
+    origem.add_argument('--diretorio', help='Pasta contendo os arquivos CSV fonte (carrega todos).')
+    origem.add_argument('--manifesto', help='manifesto.json de baixar_ssp.py: carrega só o escopo atual '
+                                            'e remove do banco o que saiu dele.')
     parser.add_argument('--dsn', default=os.getenv('DATABASE_URL'), help='DSN PostgreSQL (opcional).')
+    parser.add_argument('--workers', type=int, default=max(2, (os.cpu_count() or 2) - 1))
+    parser.add_argument('--refazer', action='store_true', help='recarrega mesmo arquivos sem mudanças')
     args = parser.parse_args()
-    directory = Path(args.diretorio)
-    files = sorted(p for p in directory.glob('*.csv') if p.is_file())
-    if not files:
-        raise SystemExit(f'Nenhum CSV encontrado em: {directory}')
+    with Progresso() as progresso:
+        total, falhas = executar(args, progresso)
+    if falhas:
+        raise SystemExit(f'Falharam: {", ".join(falhas)}')
 
-    conn_args = args.dsn or {
-        'host': os.getenv('PGHOST', 'localhost'),
-        'port': os.getenv('PGPORT', '5432'),
-        'dbname': os.getenv('PGDATABASE', 'pi2_seguranca_publica'),
-        'user': os.getenv('PGUSER', 'postgres'),
-        'password': os.getenv('PGPASSWORD') or getpass.getpass('Senha do PostgreSQL: '),
-    }
-    total = 0
-    with psycopg.connect(conn_args) as conn:
-        for path in files:
-            count = 0
-            with conn.transaction():
-                conn.execute('DELETE FROM public.registro_ocorrencia WHERE arquivo_origem = %s', (path.name,))
-                with path.open('r', encoding='utf-8-sig', newline='') as source:
-                    reader = csv.DictReader(source, delimiter=';')
-                    if not reader.fieldnames:
-                        raise ValueError(f'Arquivo sem cabeçalho: {path.name}')
-                    with conn.cursor().copy(COPY_SQL) as copy:
-                        for line_number, row in enumerate(reader, start=2):
-                            copy.write_row(make_record(path, line_number, row))
-                            count += 1
-                no_point = conn.execute(
-                    'SELECT count(*) FROM public.registro_ocorrencia WHERE arquivo_origem = %s AND localizacao IS NULL',
-                    (path.name,)).fetchone()[0]
-                conn.execute(
-                    'INSERT INTO public.carga_etl (fonte, arquivo, categoria, registros_importados, registros_sem_coordenada) '
-                    'VALUES (%s, %s, %s, %s, %s)', ('ssp-sp', path.name, category(path.name), count, no_point))
-            total += count
-            print(f'{path.name}: {count:,} registros carregados')
-    print(f'Total: {total:,} registros em {len(files)} arquivos.')
+
+def executar(args, progresso):
+    dsn = conexao(args.dsn)
+    if args.manifesto:
+        manifesto = Path(args.manifesto)
+        pasta = manifesto.parent / 'csv'
+        nomes = [c for v in json.loads(manifesto.read_text()).values() for c in v['csvs']]
+        files = [pasta / n for n in nomes if (pasta / n).is_file()]
+        for n in sorted(set(nomes) - {f.name for f in files}):
+            progresso.log(f'⚠ {n}: listado no manifesto mas ausente em {pasta}; rode a etapa ssp-baixar')
+        sincronizar(dsn, set(nomes), progresso)
+    else:
+        files = sorted(p for p in Path(args.diretorio).glob('*.csv') if p.is_file())
+    if not files:
+        raise SystemExit('Nenhum CSV para carregar.')
+    total, falhas = carregar(files, dsn, progresso, args.workers, args.refazer)
+    progresso.log(f'Total: {total:,} registros em {len(files) - len(falhas)} arquivos.')
+    return total, falhas
 
 
 if __name__ == '__main__':
