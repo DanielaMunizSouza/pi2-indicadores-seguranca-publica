@@ -1,7 +1,7 @@
 """Baixa as bases XLSX da SSP-SP e converte as abas de dados em CSV (';', UTF-8 com BOM).
 
 Saídas (em --destino, padrão data/raw/ssp):
-  xlsx/                  arquivos originais baixados
+  xlsx/                  download em andamento; cada XLSX é apagado depois de convertido (economiza disco)
   csv/                   uma CSV por aba de dados, pronta para scripts/carregar_ssp.py
   dicionarios/           abas de metodologia/dicionário de dados, em CSV
   manifesto.json         Last-Modified/tamanho de cada fonte; só baixa de novo se mudou
@@ -185,6 +185,7 @@ def main():
             manifesto[chave] = {"url": url, "last_modified": modificado, "tamanho": tamanho,
                                 "csvs": csvs, "processado_em": datetime.now().astimezone().isoformat(timespec="seconds")}
             manifesto_path.write_text(json.dumps(manifesto, indent=1, ensure_ascii=False))
+            destino.unlink()  # só depois de CSVs e manifesto gravados; o manifesto evita baixar de novo
         except Exception as erro:  # uma fonte com problema não derruba as demais
             print(f"  FALHA: {erro}", file=sys.stderr)
             falhas.append(chave)
