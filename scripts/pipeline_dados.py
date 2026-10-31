@@ -4,7 +4,8 @@ Etapas (use `--etapas` para escolher; padrão: todas as automáticas):
   geosampa-baixar    baixa camadas do GeoSampa (WFS, GeoJSON EPSG:4326) em data/raw/geosampa
   geosampa-carregar  carrega equipamentos em public.equipamento_publico
   ibge-populacao     grava a população 2022 por distrito a partir de um CSV (--populacao-csv)
-  ssp-carregar       importa os CSVs da SSP-SP (download manual; veja data/README.md)
+  ssp-baixar         baixa os XLSX da SSP-SP (só o que mudou) e converte as abas em CSV (data/raw/ssp)
+  ssp-carregar       importa os CSVs convertidos da SSP-SP em registro_ocorrencia
   distritos          importa os 96 distritos
   resumo             recalcula as tabelas de resumo usadas pelo mapa
 
@@ -26,22 +27,25 @@ RAIZ = Path(__file__).resolve().parent.parent
 SCRIPTS = Path(__file__).resolve().parent
 PAGINA = 5000
 
-# camada GeoSampa -> (categoria do IVEP, tipo de equipamento)
+# camada GeoSampa -> (categoria do IVEP, tipo de equipamento). Categorias e tipos seguem
+# geohabita/domain/thresholds.py. Fora da lista: "praca" (a camada GEOSAMPA_v_praca_largo falha
+# no servidor do GeoSampa por erro de certificado; tente de novo mais tarde).
 CAMADAS = {
-    "pde_parque_municipal": ("lazer_convivencia", "parque"),
-    "GEOSAMPA_cadparcs_parque_unidade_conservacao": ("lazer_convivencia", "parque"),
+    "pde_parque_municipal": ("lazer_convivencia", "parque_area_verde"),
+    "GEOSAMPA_cadparcs_parque_unidade_conservacao": ("lazer_convivencia", "parque_area_verde"),
     "equipamento_cultura_bibliotecas": ("cultura_esporte", "biblioteca_centro_cultural"),
     "equipamento_cultura_espacos_culturais": ("cultura_esporte", "biblioteca_centro_cultural"),
-    "equipamento_educacao_ceu": ("cultura_esporte", "ceu_esportivo"),
-    "equipamento_esporte_centro_esportivo": ("cultura_esporte", "ceu_esportivo"),
-    "equipamento_esporte_clubes": ("cultura_esporte", "ceu_esportivo"),
+    "equipamento_educacao_ceu": ("cultura_esporte", "ceu_equipamento_esportivo"),
+    "equipamento_esporte_centro_esportivo": ("cultura_esporte", "ceu_equipamento_esportivo"),
+    "equipamento_esporte_clubes": ("cultura_esporte", "ceu_equipamento_esportivo"),
     "ponto_onibus": ("mobilidade", "ponto_onibus"),
-    "terminal_onibus": ("mobilidade", "terminal_onibus"),
+    "terminal_onibus": ("mobilidade", "ponto_onibus"),
     "estacao_metro": ("mobilidade", "estacao_metro_trem"),
     "estacao_trem": ("mobilidade", "estacao_metro_trem"),
-    "equipamento_feira_livre": ("comercio_rua", "feira_livre"),
-    "equipamento_mercados_municipais": ("comercio_rua", "mercado_municipal"),
-    "equipamento_saude_ubs_posto_centro": ("servicos_essenciais", "ubs"),
+    "via_bicicleta": ("mobilidade", "ciclovia"),
+    "equipamento_feira_livre": ("comercio_rua", "feira_mercado_municipal"),
+    "equipamento_mercados_municipais": ("comercio_rua", "feira_mercado_municipal"),
+    "equipamento_saude_ubs_posto_centro": ("servicos_essenciais", "unidade_basica_saude"),
     "equipamento_educacao_rede_publica": ("servicos_essenciais", "escola_publica"),
     "equipamento_praca_wifi": ("conectividade", "wifi_publico"),
 }
@@ -123,9 +127,9 @@ def etapa_geosampa_carregar(args):
                 if not f.get("geometry"):
                     continue
                 p = f["properties"]
-                ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_equipamento") or f.get("id") or str(i)
+                ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia", "cd_equipamento") or f.get("id") or str(i)
                 linhas.append((categoria, tipo, camada, ident,
-                               primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem", "nm_parque", "nm_terminal_onibus"),
+                               primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem", "nm_trecho_via_bicicleta", "nm_parque", "nm_terminal_onibus"),
                                primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus"),
                                cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"])))
             with conn.transaction(), conn.cursor() as cur:
@@ -149,19 +153,25 @@ def script(nome, *argumentos):
     subprocess.run([sys.executable, str(SCRIPTS / nome), *argumentos], check=True)
 
 
+def etapa_ssp_baixar(args):
+    extra = ["--forcar"] if args.refazer else []
+    script("baixar_ssp.py", "--destino", args.ssp_destino, "--desde", str(args.desde), *extra)
+
+
 def etapa_ssp_carregar(args):
-    script("carregar_ssp.py", "--diretorio", args.ssp_diretorio)
+    script("carregar_ssp.py", "--diretorio", str(Path(args.ssp_destino) / "csv"))
 
 
 ETAPAS = {
     "geosampa-baixar": etapa_geosampa_baixar,
     "geosampa-carregar": etapa_geosampa_carregar,
     "ibge-populacao": etapa_ibge_populacao,
+    "ssp-baixar": etapa_ssp_baixar,
     "ssp-carregar": etapa_ssp_carregar,
     "distritos": lambda a: script("importar_distritos_sp.py"),
     "resumo": lambda a: script("atualizar_resumo_distritos.py"),
 }
-PADRAO = ["geosampa-baixar", "distritos", "geosampa-carregar", "ssp-carregar", "resumo"]
+PADRAO = ["geosampa-baixar", "distritos", "geosampa-carregar", "ssp-baixar", "ssp-carregar", "resumo"]
 
 
 def main():
@@ -170,7 +180,8 @@ def main():
     p.add_argument("--refazer", action="store_true", help="baixa novamente camadas já existentes")
     p.add_argument("--com-iluminacao", action="store_true", help="inclui a camada iluminacao_publica (grande)")
     p.add_argument("--populacao-csv")
-    p.add_argument("--ssp-diretorio", default=str(RAIZ / "data/raw/Dados Segurança Publica/SSP.SP/CSV"))
+    p.add_argument("--ssp-destino", default=str(RAIZ / "data/raw/ssp"), help="pasta de trabalho da SSP (xlsx/, csv/)")
+    p.add_argument("--desde", type=int, default=2022, help="primeiro ano das bases SSP (padrão 2022)")
     args = p.parse_args()
     for etapa in args.etapas:
         print(f"== {etapa}")
