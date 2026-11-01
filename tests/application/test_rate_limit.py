@@ -52,3 +52,13 @@ def test_refused_requests_do_not_extend_the_block():
         limiter.allow("ip")
     clock.now += 10.1
     assert limiter.allow("ip") is True
+
+
+def test_idle_clients_are_forgotten_after_a_window():
+    clock = FakeClock()
+    limiter = RateLimiter(clock=clock)
+    for i in range(100):
+        limiter.allow(f"198.51.100.{i}")
+    clock.now += WINDOW_S
+    limiter.allow("203.0.113.7")
+    assert list(limiter._requests) == ["203.0.113.7"]
