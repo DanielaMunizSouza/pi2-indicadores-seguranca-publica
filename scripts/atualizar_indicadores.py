@@ -19,7 +19,7 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from backend.app import DB_URL  # noqa: E402
+from geohabita.config import DATABASE_URL as DB_URL  # noqa: E402
 from geohabita.domain.equipment import EQUIPMENT_CATEGORY  # noqa: E402
 from geohabita.domain.rates import occurrence_group  # noqa: E402
 from geohabita.domain.thresholds import CATEGORIES  # noqa: E402

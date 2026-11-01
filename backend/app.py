@@ -1,8 +1,6 @@
 import json
 import logging
-import os
 from datetime import date
-from pathlib import Path
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -16,28 +14,18 @@ from geohabita.infrastructure.cep_providers import brasilapi,brasilapi_coordinat
 from geohabita.infrastructure.nominatim import NominatimGeocoder
 from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
 
-ROOT=Path(__file__).resolve().parents[1]
-# Read local configuration when present; environment variables still take precedence.
-_env_file=ROOT/".env"
-if _env_file.is_file():
-    for _line in _env_file.read_text(encoding="utf-8").splitlines():
-        _key, _sep, _value = _line.partition("=")
-        if _sep and _key.strip() and not _key.lstrip().startswith("#"):
-            os.environ.setdefault(_key.strip(), _value.strip().strip("\"'").strip())
-DB_URL=os.getenv("DATABASE_URL","postgresql://postgres@localhost:5432/ProjetoIntergrador_2")
+from geohabita.config import DATABASE_URL as DB_URL, ROOT, TRUSTED_PROXIES, is_trusted
 MUNICIPIOS_SP=["São Paulo","S.PAULO","SAO PAULO","SÃO PAULO"]  # "São Paulo" é a forma gravada pelo importador
 CATEGORIES={"objetos":"Objetos","celulares_subtraidos":"Celulares subtraídos","apreensao_entorpecente":"Apreensão de entorpecentes","entorpecentes_gramas":"Entorpecentes (gramas)","veiculos":"Veículos subtraídos","veiculos_recuperados":"Veículos recuperados","criminal":"Dados criminais (SPDados)","mdip":"Mortes decorrentes de intervenção policial","prisoes":"Prisões efetuadas","presos_apreendidos":"Presos e apreendidos","armas_apreendidas":"Armas de fogo apreendidas","flagrantes":"Flagrantes lavrados","apreensao_eca":"Apreensões (art. 173 ECA)","outros":"Outros"}
 app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1.0.0",description="Resumos agregados por período, categoria e localização.")
 
 rate_limiter=RateLimiter()
 
-# O cloudflared conecta pela própria máquina; só dele o CF-Connecting-IP é confiável.
-TRUSTED_PROXIES={"127.0.0.1","::1"}
-
+# Só do cloudflared (local ou na rede do Docker) o CF-Connecting-IP é confiável.
 def client_ip(request:Request)->str:
     peer=request.client.host if request.client else None
     forwarded=request.headers.get("cf-connecting-ip","").strip()
-    if peer in TRUSTED_PROXIES and forwarded: return forwarded
+    if is_trusted(peer,TRUSTED_PROXIES) and forwarded: return forwarded
     return peer or "desconhecido"
 
 class AccessLogWithoutQuery(logging.Filter):

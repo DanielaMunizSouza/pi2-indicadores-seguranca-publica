@@ -8,7 +8,7 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from backend.app import DB_URL
+from geohabita.config import DATABASE_URL as DB_URL
 
 ARQUIVO = ROOT / "data" / "reference" / "distritos_sp.geojson"
 
