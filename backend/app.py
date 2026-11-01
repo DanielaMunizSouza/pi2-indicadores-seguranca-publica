@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -30,12 +31,31 @@ app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1
 
 rate_limiter=RateLimiter()
 
+# O cloudflared conecta pela própria máquina; só dele o CF-Connecting-IP é confiável.
+TRUSTED_PROXIES={"127.0.0.1","::1"}
+
+def client_ip(request:Request)->str:
+    peer=request.client.host if request.client else None
+    forwarded=request.headers.get("cf-connecting-ip","").strip()
+    if peer in TRUSTED_PROXIES and forwarded: return forwarded
+    return peer or "desconhecido"
+
+class AccessLogWithoutQuery(logging.Filter):
+    """RNF15 (LGPD): o log de acesso não guarda o CEP consultado junto do IP de quem consultou."""
+    def filter(self,record):
+        if isinstance(record.args,tuple) and len(record.args)>=3 and isinstance(record.args[2],str):
+            path=record.args[2].split("?",1)[0]
+            if path.startswith("/api/cep/"): path="/api/cep/<cep>"
+            record.args=record.args[:2]+(path,)+record.args[3:]
+        return True
+
+logging.getLogger("uvicorn.access").addFilter(AccessLogWithoutQuery())
+
 @app.middleware("http")
 async def limit_api_requests(request:Request,call_next):
     # RNF08: 60 requisições por minuto por IP nas rotas públicas da API.
     # Atrás de um proxy reverso, o IP do cliente deve vir do próprio proxy.
-    client=request.client.host if request.client else "desconhecido"
-    if request.url.path.startswith("/api/") and not rate_limiter.allow(client):
+    if request.url.path.startswith("/api/") and not rate_limiter.allow(client_ip(request)):
         return JSONResponse({"detail":"Muitas requisições. Aguarde um minuto e tente novamente."},status_code=429,headers={"Retry-After":"60"})
     return await call_next(request)
 
