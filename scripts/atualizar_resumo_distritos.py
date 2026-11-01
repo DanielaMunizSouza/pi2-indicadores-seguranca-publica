@@ -6,7 +6,10 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from backend.app import DB_URL, MUNICIPIOS_SP
+from geohabita.config import DATABASE_URL as DB_URL
+from geohabita.domain.ssp import SAO_PAULO_NAMES
+
+MUNICIPIOS_SP = list(SAO_PAULO_NAMES)
 
 
 def main() -> None:
