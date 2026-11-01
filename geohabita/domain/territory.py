@@ -21,4 +21,4 @@ def is_sao_paulo(ibge_code: str | None) -> bool:
     Um código ausente não permite afirmar que o endereço está no município e,
     portanto, resulta em ``False``.
     """
-    raise NotImplementedError
+    return ibge_code == SAO_PAULO_IBGE_CODE

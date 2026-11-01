@@ -36,11 +36,18 @@ class NearbyEquipment:
     type: str
     name: str
     distance_m: float
+    latitude: float | None = None  # ponto do equipamento (ou do contorno mais próximo), para o mapa
+    longitude: float | None = None
 
 
 def nearest_by_type(items: Iterable[NearbyEquipment]) -> dict[str, NearbyEquipment]:
     """Equipamento mais próximo de cada tipo presente na lista (RN12)."""
-    raise NotImplementedError
+    nearest: dict[str, NearbyEquipment] = {}
+    for item in items:
+        current = nearest.get(item.type)
+        if current is None or item.distance_m < current.distance_m:
+            nearest[item.type] = item
+    return nearest
 
 
 def within_radius(
@@ -50,9 +57,13 @@ def within_radius(
 
     Cada grupo é ordenado da menor para a maior distância.
     """
-    raise NotImplementedError
+    groups: dict[str, list[NearbyEquipment]] = {}
+    for item in sorted(items, key=lambda e: e.distance_m):
+        if item.distance_m <= radius_m:
+            groups.setdefault(EQUIPMENT_CATEGORY[item.type], []).append(item)
+    return groups
 
 
 def missing_type_message(max_m: int) -> str:
     """Mensagem para tipo sem equipamento a menos de ``max_m`` metros (RN15)."""
-    raise NotImplementedError
+    return f"nenhum equipamento deste tipo a menos de {max_m} metros"

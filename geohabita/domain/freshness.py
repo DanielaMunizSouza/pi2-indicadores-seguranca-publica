@@ -7,7 +7,8 @@ referência supere 24 meses (RN11; RF12).
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import calendar
+from datetime import date, datetime, timedelta
 
 CACHE_MAX_AGE_DAYS = 30
 OUTDATED_AFTER_MONTHS = 24
@@ -22,7 +23,7 @@ def is_cache_fresh(
     O resultado é válido enquanto sua idade for de até ``max_age_days`` dias,
     inclusive.
     """
-    raise NotImplementedError
+    return now - cached_at <= timedelta(days=max_age_days)
 
 
 def is_outdated(
@@ -33,4 +34,11 @@ def is_outdated(
     A idade é contada em meses de calendário; um indicador com exatamente
     ``max_months`` meses ainda não é considerado desatualizado.
     """
-    raise NotImplementedError
+    return today > _add_months(reference_date, max_months)
+
+
+def _add_months(day: date, months: int) -> date:
+    """Soma meses de calendário, limitando o dia ao último dia do mês."""
+    month_index = day.month - 1 + months
+    year, month = day.year + month_index // 12, month_index % 12 + 1
+    return day.replace(year=year, month=month, day=min(day.day, calendar.monthrange(year, month)[1]))

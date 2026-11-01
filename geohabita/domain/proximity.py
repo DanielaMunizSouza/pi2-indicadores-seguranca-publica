@@ -8,6 +8,7 @@ geodésica em linha reta (RN12).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 WALK_SPEED_M_PER_MINUTE = 80
@@ -20,17 +21,23 @@ def proximity_note(distance_m: float | None, ideal_m: float, max_m: float) -> fl
     0 quando ``distance_m >= max_m`` e interpolação linear no intervalo.
     Uma distância ausente (nenhum equipamento do tipo) resulta em 0 (RN15).
     """
-    raise NotImplementedError
+    if distance_m is None or distance_m >= max_m:
+        return 0.0
+    if distance_m <= ideal_m:
+        return 100.0
+    return 100 * (max_m - distance_m) / (max_m - ideal_m)
 
 
 def category_note(notes: Sequence[float]) -> float:
     """Nota da categoria: média aritmética das notas dos seus tipos."""
-    raise NotImplementedError
+    if not notes:
+        raise ValueError("A categoria precisa de ao menos uma nota de tipo.")
+    return sum(notes) / len(notes)
 
 
 def walking_time_minutes(distance_m: float) -> int:
     """Tempo estimado de caminhada a 80 m/min, arredondado para cima (RN14)."""
-    raise NotImplementedError
+    return math.ceil(distance_m / WALK_SPEED_M_PER_MINUTE)
 
 
 def weighted_index(scores: Sequence[float], weights: Sequence[float]) -> float:
@@ -39,11 +46,16 @@ def weighted_index(scores: Sequence[float], weights: Sequence[float]) -> float:
     Levanta ``ValueError`` quando as listas têm tamanhos diferentes ou quando
     a soma dos pesos é zero, casos em que o índice não está definido.
     """
-    raise NotImplementedError
+    if len(scores) != len(weights):
+        raise ValueError("Cada nota precisa de exatamente um peso.")
+    total_weight = sum(weights)
+    if total_weight == 0:
+        raise ValueError("A soma dos pesos deve ser maior que zero.")
+    return sum(s * w for s, w in zip(scores, weights)) / total_weight
 
 
 def local_proximity_index(
     category_notes: Sequence[float], weights: Sequence[float]
 ) -> float:
     """Índice de Proximidade Local do endereço consultado (RF24)."""
-    raise NotImplementedError
+    return weighted_index(category_notes, weights)

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#103746">
+<title>Diagnóstico do endereço · GeoHabita São Paulo</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+:root{color-scheme:light;--ink:#153241;--muted:#566e7a;--line:#d9e4e8;--teal:#087f78;--teal-dark:#06635e;--paper:#fff;--canvas:#edf3f5;--focus:#005fcc;--neutral:#4a6b7c;--neutral-soft:#b9cbd3;
+ --c-lazer:#2e7d32;--c-cultura:#6a3d9a;--c-mobilidade:#1f5fa8;--c-comercio:#8a5a00;--c-servicos:#00796b;--c-conectividade:#455a64;
+ font-family:Inter,"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);line-height:1.45}
+button,input,select{font:inherit}a{color:var(--teal-dark)}
+:focus-visible{outline:3px solid var(--focus)!important;outline-offset:3px}
+.skip-link{position:fixed;z-index:3000;left:12px;top:-80px;padding:12px 16px;background:#fff;color:#12394a;border-radius:8px;font-weight:800}.skip-link:focus{top:12px}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+header{background:linear-gradient(115deg,#103746,#164f56 72%,#17736b);color:#fff;padding:16px max(20px,calc((100% - 1400px)/2))}
+.head-inner{max-width:1400px;margin:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.eyebrow{margin:0 0 3px;color:#a8e3d6;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+h1{margin:0;font-size:clamp(21px,2.2vw,28px);letter-spacing:-.03em}
+.top-nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}.top-nav a{color:#fff;text-decoration:none;border:1px solid #ffffff40;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700}.top-nav a[aria-current]{background:#ffffff26}
+main{max-width:1400px;margin:18px auto 0;padding:0 20px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 6px 20px #1537460a}
+.card h2,.card h3{margin:0 0 10px}.card h2{font-size:17px}.card h3{font-size:15px}
+.search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.search label{display:block;font-weight:800;font-size:14px;margin-bottom:5px}
+.search input{width:100%;height:46px;border:1px solid #8ebdb7;border-radius:9px;padding:8px 12px;font-size:18px;letter-spacing:.04em;font-variant-numeric:tabular-nums;background:#f7fbfa}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.btn{min-height:46px;border:0;border-radius:9px;padding:9px 16px;font-weight:800;font-size:14px;cursor:pointer;background:var(--teal);color:#fff}.btn:hover{background:var(--teal-dark)}.btn:disabled{opacity:.6;cursor:wait}
+.btn-light{background:#e6eff2;color:#21424f}.btn-light:hover{background:#d7e6ea}
+.status{margin-top:12px;padding:10px 12px;border-radius:9px;background:#f2f6f7;color:#3d5864;font-size:14px}
+.status.erro{background:#fbefe9;color:#7a3413}
+.place{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;margin:16px 0 10px}
+.place h2{margin:0;font-size:20px}.place .district{font-weight:800;color:var(--teal-dark)}
+.notice{font-size:13px;color:var(--muted);margin:0}
+.warning{border-left:4px solid #8a5a00;background:#fff8e8;padding:12px 14px;border-radius:8px;margin:14px 0}
+[role=tablist]{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-top:6px}
+[role=tab]{border:0;background:none;padding:11px 14px;font-weight:800;font-size:14px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer}
+[role=tab][aria-selected=true]{color:var(--ink);border-bottom-color:var(--teal)}
+[role=tabpanel]{padding-top:14px}
+.layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);gap:14px;align-items:start}
+.stack{display:grid;gap:14px}.layout.half{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}abbr{text-decoration:none}
+#map{height:min(64vh,620px);min-height:380px;border-radius:10px;background:#e4edef}
+.filters{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:14px}
+.filters label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.swatch{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px #0003}
+.score{display:flex;align-items:baseline;gap:8px}.score strong{font-size:44px;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.score span{color:var(--muted);font-size:15px}
+.compare{font-size:14px;color:var(--muted);margin:2px 0 10px}
+.bars{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.bar{display:grid;grid-template-columns:minmax(120px,1fr) minmax(80px,1.4fr) 52px;gap:8px;align-items:center;font-size:14px}
+.track{height:10px;background:#e8eff1;border-radius:6px;overflow:hidden;position:relative}
+.fill{height:100%;background:var(--teal);border-radius:6px}
+.track .median{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.value{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+caption{text-align:left;font-weight:800;padding-bottom:8px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #e7edef;vertical-align:top}
+thead th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#4f6773;background:#fff}tbody th{font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.table-wrap{overflow:auto;max-height:520px}
+.table-wrap thead th{position:sticky;top:0}
+.tag{display:inline-block;font-size:12px;padding:1px 7px;border-radius:999px;background:#eef3f5;color:#3f5966}
+.weights{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.weights label{display:grid;gap:4px;font-size:14px;font-weight:700}
+.weights select{height:40px;border:1px solid #c8d6db;border-radius:8px;padding:4px 8px;background:#fcfdfd}
+.occ-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.occ h3{display:flex;justify-content:space-between;gap:8px}
+.pair{display:grid;gap:6px;margin:8px 0}
+.pair .bar{grid-template-columns:110px minmax(60px,1fr) 70px}
+.pair .fill.city{background:var(--neutral-soft)}.pair .fill.district{background:var(--neutral)}
+.trend{font-size:14px}
+.method{max-width:1400px;margin:18px auto 28px;padding:0 20px;font-size:14px;color:#3f5966}
+.method details{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:10px}
+.method summary{font-weight:800;cursor:pointer}
+.method p,.method li{max-width:980px}
+.leaflet-container{font:inherit}.popup-title{font-weight:800}
+[hidden]{display:none!important}#local-titulo:focus{outline:none}
+@media(max-width:980px){.layout,.layout.half{grid-template-columns:1fr}#map{height:52vh;min-height:320px}}
+@media(max-width:560px){main{padding:0 10px}.search{grid-template-columns:1fr}.bar{grid-template-columns:minmax(100px,1fr) minmax(50px,1fr) 46px}.score strong{font-size:36px}[role=tab]{padding:9px 9px;font-size:13px}.top-nav{margin-left:0}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#consulta">Pular para a consulta</a>
+<header><div class="head-inner">
+ <div><p class="eyebrow">GeoHabita · dados públicos de São Paulo</p><h1>Diagnóstico do endereço</h1></div>
+ <nav class="top-nav" aria-label="Seções do site"><a href="/" aria-current="page">Diagnóstico do endereço</a><a href="/explorar">Explorar ocorrências</a><a href="#como-calculamos">Como calculamos</a><a href="#fontes">Fontes dos dados</a></nav>
+</div></header>
+
+<main id="conteudo">
+<section class="card" id="consulta" aria-labelledby="consulta-titulo">
+ <h2 id="consulta-titulo">Consulte um endereço de São Paulo</h2>
+ <form class="search" id="form" role="search" novalidate>
+  <div><label for="cep">CEP</label><input id="cep" name="cep" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" aria-describedby="cep-ajuda">
+   <p id="cep-ajuda" class="hint">Digite os 8 números do CEP. Depois de uma consulta, você também pode clicar no mapa para ver outro ponto.</p></div>
+  <button class="btn" id="consultar" type="submit">Ver diagnóstico</button>
+ </form>
+ <div id="status" class="status" role="status" aria-live="polite">Informe um CEP para ver a infraestrutura pública do entorno e os indicadores do distrito.</div>
+</section>
+
+<section id="fora" class="card warning" hidden aria-labelledby="fora-titulo"><h2 id="fora-titulo">Endereço fora do município</h2><p id="fora-texto"></p></section>
+
+<section id="resultado" hidden aria-labelledby="local-titulo">
+ <div class="place"><h2 id="local-titulo" tabindex="-1"></h2><span class="district" id="local-distrito"></span></div>
+ <p class="notice" id="local-aviso"></p>
+
+ <div role="tablist" aria-label="Partes do diagnóstico" id="abas">
+  <button role="tab" id="aba-proximidade" aria-controls="painel-proximidade" aria-selected="true">Proximidade</button>
+  <button role="tab" id="aba-vitalidade" aria-controls="painel-vitalidade" aria-selected="false" tabindex="-1">Vitalidade do distrito</button>
+  <button role="tab" id="aba-ocorrencias" aria-controls="painel-ocorrencias" aria-selected="false" tabindex="-1">Ocorrências oficiais</button>
+  <button role="tab" id="aba-tabela" aria-controls="painel-tabela" aria-selected="false" tabindex="-1">Ver como tabela</button>
+ </div>
+
+ <div role="tabpanel" id="painel-proximidade" aria-labelledby="aba-proximidade" tabindex="0">
+  <div class="layout">
+   <section class="card" aria-labelledby="mapa-titulo">
+    <h3 id="mapa-titulo">Mapa do entorno</h3>
+    <div id="map" role="region" aria-label="Mapa com o ponto consultado, o limite do distrito, os raios de 500 metros e 1 quilômetro e os equipamentos públicos. O mesmo conteúdo está na aba Ver como tabela."></div>
+    <fieldset class="filters" id="filtros"><legend class="sr-only">Mostrar no mapa as categorias</legend></fieldset>
+    <p class="hint">Círculos tracejados: 500 m e 1 km em linha reta. Linha contínua: limite do distrito.</p>
+   </section>
+   <div class="stack">
+    <section class="card" aria-labelledby="ipl-titulo">
+     <h3 id="ipl-titulo">Índice de Proximidade Local</h3>
+     <div class="score"><strong id="ipl">—</strong><span>de 100</span></div>
+     <p class="compare">Quão perto o endereço está dos equipamentos que trazem gente às ruas. Distâncias em linha reta a partir do CEP.</p>
+     <ul class="bars" id="ipl-categorias"></ul>
+    </section>
+    <section class="card" aria-labelledby="pesos-titulo">
+     <h3 id="pesos-titulo">Minhas prioridades</h3>
+     <p class="hint" style="margin-top:0">Escolha de 0 (não importa) a 5 (muito importante). Os índices são recalculados na hora.</p>
+     <div class="weights" id="pesos"></div>
+    </section>
+   </div>
+  </div>
+  <section class="card" style="margin-top:14px" aria-labelledby="tipos-titulo">
+   <h3 id="tipos-titulo">Equipamento mais próximo de cada tipo</h3>
+   <div class="table-wrap"><table><caption class="sr-only">Equipamento mais próximo de cada tipo, com distância em linha reta, tempo a pé, nota e quantidade a até 500 metros e 1 quilômetro</caption>
+    <thead><tr><th scope="col">Tipo</th><th scope="col">Mais próximo</th><th scope="col" class="num">Distância</th><th scope="col" class="num">A pé</th><th scope="col" class="num">Nota</th><th scope="col" class="num">Até 500 m</th><th scope="col" class="num">Até 1 km</th></tr></thead>
+    <tbody id="tipos"></tbody></table></div>
+  </section>
+ </div>
+
+ <div role="tabpanel" id="painel-vitalidade" aria-labelledby="aba-vitalidade" tabindex="0" hidden>
+  <div class="layout half">
+   <section class="card" aria-labelledby="ivep-titulo">
+    <h3 id="ivep-titulo">Índice de Vitalidade do Espaço Público</h3>
+    <div class="score"><strong id="ivep">—</strong><span>de 100</span></div>
+    <p class="compare" id="ivep-mediana"></p>
+    <p class="hint">Mede a oferta de equipamentos do distrito inteiro, por área e por habitante, em comparação com os outros 95 distritos. 50 é o meio da cidade.</p>
+    <ul class="bars" id="ivep-categorias" aria-describedby="ivep-legenda"></ul>
+    <p class="hint" id="ivep-legenda">A barra mostra a posição do distrito entre os 96 (0 = menor oferta, 100 = maior).</p>
+   </section>
+   <section class="card" aria-labelledby="vit-tabela-titulo">
+    <h3 id="vit-tabela-titulo">Oferta por categoria no distrito</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Equipamentos por categoria no distrito, densidade por quilômetro quadrado e por 10 mil habitantes e posição entre os distritos</caption>
+     <thead><tr><th scope="col">Categoria</th><th scope="col" class="num"><abbr title="Equipamentos no distrito">Qtde.</abbr></th><th scope="col" class="num">Por km²</th><th scope="col" class="num"><abbr title="Por 10 mil habitantes">Por 10 mil</abbr></th><th scope="col" class="num">Posição</th></tr></thead>
+     <tbody id="vitalidade"></tbody></table></div>
+   </section>
+  </div>
+ </div>
+
+ <div role="tabpanel" id="painel-ocorrencias" aria-labelledby="aba-ocorrencias" tabindex="0" hidden>
+  <section class="card" aria-labelledby="occ-titulo">
+   <h3 id="occ-titulo">Registros policiais no distrito</h3>
+   <p id="occ-janela" class="compare"></p>
+   <p class="warning" id="occ-subnotificacao" style="margin-top:0"></p>
+   <div class="occ-grid" id="ocorrencias"></div>
+   <p class="hint" id="occ-observacao"></p>
+  </section>
+ </div>
+
+ <div role="tabpanel" id="painel-tabela" aria-labelledby="aba-tabela" tabindex="0" hidden>
+  <section class="card">
+   <div class="table-wrap"><table><caption>Todos os equipamentos públicos a até 1 km do ponto consultado (o mesmo conteúdo do mapa)</caption>
+    <thead><tr><th scope="col">Categoria</th><th scope="col">Tipo</th><th scope="col">Nome</th><th scope="col" class="num">Distância</th><th scope="col" class="num">A pé</th></tr></thead>
+    <tbody id="entorno"></tbody></table></div>
+  </section>
+ </div>
+</section>
+</main>
+
+<footer class="method">
+ <details id="como-calculamos"><summary>Como calculamos</summary>
+  <p><strong>Proximidade (IPL).</strong> Para cada tipo de equipamento, medimos a distância em linha reta do ponto do CEP até o mais próximo. Até uma distância ideal a nota é 100; a partir de uma distância máxima é 0; no meio, cai aos poucos. Exemplo: ponto de ônibus tem nota 100 até 300 m e 0 a partir de 800 m. A nota de cada categoria é a média dos seus tipos, e o índice é a média das categorias, com os pesos que você escolher. Tipos sem dados na fonte ficam fora da conta, com aviso.</p>
+  <p><strong>Vitalidade (IVEP).</strong> Contamos os equipamentos de cada categoria no distrito e calculamos quantos há por km² e por 10 mil moradores. Comparamos com os outros 95 distritos: a posição vai de 0 (menor oferta) a 100 (maior). O índice é a média das posições, com os seus pesos.</p>
+  <p><strong>Ocorrências.</strong> Taxa por 100 mil moradores por ano, nos três últimos anos completos (o ano em curso não entra, porque ainda está incompleto). Só contam registros com localização dentro do distrito. Com menos de 30 registros no período, não mostramos taxa nem tendência. A tendência compara o último ano com o primeiro: variação de 10% ou mais é "alta" ou "queda".</p>
+  <p><strong>Por que não há nota única de segurança.</strong> Infraestrutura e registros policiais medem coisas diferentes e são mostrados lado a lado, nunca somados. Registros policiais dependem de a pessoa procurar a polícia, e em distritos com muito movimento e poucos moradores, como o centro, a taxa por morador fica muito alta porque a maioria das pessoas que circulam ali mora em outro lugar.</p>
+ </details>
+ <details id="fontes"><summary>Fontes dos dados</summary>
+  <ul id="lista-fontes"><li>Faça uma consulta para ver as datas de referência de cada fonte.</li></ul>
+  <p>Mapa base © colaboradores do OpenStreetMap. Camadas do GeoSampa sob licença CC BY-SA. Código sob GNU AGPL-3.0.</p>
+ </details>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const num=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
+const int=new Intl.NumberFormat('pt-BR');
+const CATEGORIAS={lazer_convivencia:['Lazer e convivência','var(--c-lazer)','#2e7d32'],cultura_esporte:['Cultura e esporte','var(--c-cultura)','#6a3d9a'],mobilidade:['Mobilidade','var(--c-mobilidade)','#1f5fa8'],comercio_rua:['Comércio de rua','var(--c-comercio)','#8a5a00'],servicos_essenciais:['Serviços essenciais','var(--c-servicos)','#00796b'],conectividade:['Conectividade','var(--c-conectividade)','#455a64']};
+const TIPOS={praca:'Praça',parque_area_verde:'Parque ou área verde',biblioteca_centro_cultural:'Biblioteca ou centro cultural',ceu_equipamento_esportivo:'CEU ou equipamento esportivo',ponto_onibus:'Ponto de ônibus',estacao_metro_trem:'Estação de metrô ou trem',ciclovia:'Ciclovia',feira_mercado_municipal:'Feira livre ou mercado',unidade_basica_saude:'Unidade básica de saúde',escola_publica:'Escola pública',wifi_publico:'Wi-Fi público'};
+const TENDENCIA={alta:'Em alta no período',queda:'Em queda no período','estável':'Estável no período'};
+const state={lat:null,lon:null,endereco:null,distrito:null,origem:null,dados:null,pedido:0};
+
+// ---------- utilidades ----------
+const el=(tag,props={},...kids)=>{const e=document.createElement(tag);for(const [k,v] of Object.entries(props)){if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.startsWith('aria-')||k==='role'||k==='scope')e.setAttribute(k,v);else e[k]=v}e.append(...kids.filter(k=>k!=null));return e};
+const distancia=m=>m==null?'—':m<1000?`${int.format(Math.round(m))} m`:`${num.format(m/1000)} km`;
+const minutos=m=>m==null?'—':`${int.format(Math.ceil(m/80))} min`;
+function anunciar(msg,erro=false){const s=$('status');s.textContent=msg;s.classList.toggle('erro',erro)}
+async function getJSON(url){const r=await fetch(url);let d={};try{d=await r.json()}catch{}if(!r.ok){const det=Array.isArray(d.detail)?'Parâmetro inválido.':d.detail;throw Error(det||'Não foi possível consultar o serviço.')}return d}
+function pesos(){const p={};for(const c of Object.keys(CATEGORIAS))p['peso_'+c]=$('peso-'+c).value;return p}
+function barra(rotulo,valor,{mediana=null,cor=null,sufixo=''}={}){const pct=valor==null?0:Math.max(0,Math.min(100,valor));const fill=el('div',{class:'fill'});fill.style.width=pct+'%';if(cor)fill.style.background=cor;const track=el('div',{class:'track','role':'img','aria-label':`${rotulo}: ${valor==null?'sem dados':num.format(valor)+' de 100'}`},fill);if(mediana!=null){const m=el('div',{class:'median'});m.style.left=mediana+'%';track.append(m)}return el('li',{class:'bar'},el('span',{text:rotulo}),track,el('span',{class:'value',text:valor==null?'—':num.format(valor)+sufixo}))}
+
+// ---------- pesos (RF09) ----------
+for(const [c,[rotulo]] of Object.entries(CATEGORIAS)){const sel=el('select',{id:'peso-'+c});for(let i=0;i<=5;i++)sel.add(new Option(i===0?'0 · não importa':i===5?'5 · muito importante':String(i),String(i),i===1,i===1));sel.addEventListener('change',recalcular);$('pesos').append(el('label',{htmlFor:'peso-'+c},rotulo,sel))}
+let espera=null;function recalcular(){clearTimeout(espera);if(state.lat==null)return;espera=setTimeout(()=>diagnosticar({lat:state.lat,lon:state.lon},true),250)}
+
+// ---------- abas (padrão WAI-ARIA) ----------
+const abas=[...document.querySelectorAll('[role=tab]')];
+function abrirAba(aba,foco=true){for(const a of abas){const sel=a===aba;a.setAttribute('aria-selected',String(sel));a.tabIndex=sel?0:-1;$(a.getAttribute('aria-controls')).hidden=!sel}if(foco)aba.focus();if(aba.id==='aba-proximidade')setTimeout(()=>mapa.invalidateSize(),50)}
+abas.forEach((a,i)=>{a.addEventListener('click',()=>abrirAba(a));a.addEventListener('keydown',e=>{const k={ArrowRight:i+1,ArrowLeft:i-1,Home:0,End:abas.length-1}[e.key];if(k!=null){e.preventDefault();abrirAba(abas[(k+abas.length)%abas.length])}})});
+
+// ---------- mapa (RF13) ----------
+const mapa=L.map('map',{keyboard:true,minZoom:10,maxZoom:18}).setView([-23.55,-46.63],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(mapa);
+const camadas={base:L.layerGroup().addTo(mapa),categorias:{}};
+for(const [c,[rotulo,,cor]] of Object.entries(CATEGORIAS)){camadas.categorias[c]=L.layerGroup().addTo(mapa);const cb=el('input',{type:'checkbox',checked:true,id:'f-'+c});cb.addEventListener('change',()=>cb.checked?camadas.categorias[c].addTo(mapa):camadas.categorias[c].remove());const sw=el('span',{class:'swatch','aria-hidden':'true'});sw.style.background=cor;$('filtros').append(el('label',{htmlFor:'f-'+c},cb,sw,rotulo))}
+mapa.on('click',e=>{if(state.lat==null)return;state.endereco=null;diagnosticar({lat:e.latlng.lat,lon:e.latlng.lng})});
+const limites={};
+async function desenharMapa(d){mapa.invalidateSize();camadas.base.clearLayers();Object.values(camadas.categorias).forEach(g=>g.clearLayers());
+ const ponto=[state.lat,state.lon];
+ L.marker(ponto,{title:'Ponto consultado',alt:'Ponto consultado',keyboard:true}).bindPopup(state.endereco?`${state.endereco.logradouro||'CEP '+state.endereco.cep}`:'Ponto escolhido no mapa').addTo(camadas.base);
+ for(const r of [500,1000])L.circle(ponto,{radius:r,color:'#21424f',weight:1.5,dashArray:'6 6',fill:false,interactive:false}).addTo(camadas.base);
+ for(const [categoria,itens] of Object.entries(d.proximidade.entorno)){const cor=CATEGORIAS[categoria][2];for(const it of itens){if(it.latitude==null)continue;const m=L.circleMarker([it.latitude,it.longitude],{radius:6,color:'#fff',weight:1.5,fillColor:cor,fillOpacity:.95});const box=el('div',{},el('div',{class:'popup-title',text:it.nome}),el('div',{text:`${TIPOS[it.tipo]} · ${distancia(it.distancia_m)} em linha reta`}));m.bindPopup(box);m.addTo(camadas.categorias[categoria])}}
+ const cod=state.distrito.codigo;try{limites[cod]=limites[cod]||await getJSON(`/api/distritos/${encodeURIComponent(cod)}/limite`);L.geoJSON(limites[cod],{style:{color:'#21424f',weight:2,fill:false},interactive:false}).addTo(camadas.base)}catch{}
+ mapa.invalidateSize();mapa.fitBounds(L.latLng(ponto).toBounds(2300))}
+
+// ---------- renderização ----------
+function linhaVazia(tbody,colunas,texto){tbody.replaceChildren(el('tr',{},el('td',{colSpan:colunas,text:texto})))}
+function renderProximidade(p){
+ $('ipl').textContent=p.ipl==null?'—':num.format(p.ipl);
+ const ul=$('ipl-categorias');ul.replaceChildren();
+ for(const [c,info] of Object.entries(p.categorias)){const li=barra(CATEGORIAS[c][0],info.nota,{cor:CATEGORIAS[c][1]});if(info.nota==null)li.querySelector('.value').title='sem dados na fonte';ul.append(li)}
+ const tb=$('tipos');tb.replaceChildren();
+ for(const [t,info] of Object.entries(p.tipos)){
+  const nome=info.disponivel?(info.nome||'—'):el('span',{class:'muted',text:'sem dados na fonte'});
+  const tr=el('tr',{},el('th',{scope:'row',text:TIPOS[t]}),el('td',{},nome,info.aviso&&info.disponivel?el('div',{class:'muted',text:info.aviso}):null),
+   el('td',{class:'num',text:distancia(info.distancia_m)}),el('td',{class:'num',text:info.tempo_caminhada_min==null?'—':`${info.tempo_caminhada_min} min`}),
+   el('td',{class:'num',text:info.nota==null?'—':num.format(info.nota)}),el('td',{class:'num',text:info.ate_500m??'—'}),el('td',{class:'num',text:info.ate_1km??'—'}));
+  tb.append(tr)}
+ const lista=[];for(const [c,itens] of Object.entries(p.entorno))for(const it of itens)lista.push([c,it]);lista.sort((a,b)=>a[1].distancia_m-b[1].distancia_m);
+ const te=$('entorno');te.replaceChildren();if(!lista.length)linhaVazia(te,5,'Nenhum equipamento a até 1 km.');
+ for(const [c,it] of lista)te.append(el('tr',{},el('td',{text:CATEGORIAS[c][0]}),el('td',{text:TIPOS[it.tipo]}),el('th',{scope:'row',text:it.nome}),el('td',{class:'num',text:distancia(it.distancia_m)}),el('td',{class:'num',text:minutos(it.distancia_m)})))}
+function renderVitalidade(v){
+ $('ivep').textContent=num.format(v.ivep);
+ $('ivep-mediana').textContent=v.mediana_municipal==null?'':`Mediana dos 96 distritos com os mesmos pesos: ${num.format(v.mediana_municipal)}.`;
+ const ul=$('ivep-categorias');ul.replaceChildren();const tb=$('vitalidade');tb.replaceChildren();
+ for(const [c,info] of Object.entries(v.categorias)){ul.append(barra(CATEGORIAS[c][0],info.percentil,{cor:CATEGORIAS[c][1],mediana:50}));
+  tb.append(el('tr',{},el('th',{scope:'row',text:CATEGORIAS[c][0]}),el('td',{class:'num',text:info.equipamentos==null?'—':int.format(info.equipamentos)}),el('td',{class:'num',text:info.densidade_km2==null?'—':num.format(info.densidade_km2)}),el('td',{class:'num',text:info.densidade_10k_hab==null?'—':num.format(info.densidade_10k_hab)}),el('td',{class:'num',text:info.percentil==null?'—':num.format(info.percentil)})))}}
+function renderOcorrencias(o){
+ $('occ-janela').textContent=`Taxa por 100 mil moradores por ano, de ${o.janela[0]} a ${o.janela[1]} · população do distrito: ${int.format(o.populacao)} (Censo 2022).`;
+ $('occ-subnotificacao').textContent=o.aviso_subnotificacao;$('occ-observacao').textContent=o.observacao;
+ const grid=$('ocorrencias');grid.replaceChildren();
+ for(const n of Object.values(o.naturezas)){
+  const card=el('article',{class:'card occ'},el('h3',{},el('span',{text:n.rotulo}),el('span',{class:'tag',text:`${int.format(n.ocorrencias)} registros`})));
+  if(n.taxa_100k_ano==null){card.append(el('p',{class:'muted',text:`${n.mensagem[0].toUpperCase()}${n.mensagem.slice(1)}.`}))}
+  else{const max=Math.max(n.taxa_100k_ano,n.taxa_municipal_100k_ano||0)||1;
+   const linha=(rotulo,valor,cls)=>{const f=el('div',{class:'fill '+cls});f.style.width=(100*valor/max)+'%';return el('div',{class:'bar'},el('span',{text:rotulo}),el('div',{class:'track','role':'img','aria-label':`${rotulo}: ${num.format(valor)} por 100 mil por ano`},f),el('span',{class:'value',text:num.format(valor)}))};
+   card.append(el('div',{class:'pair'},linha('Este distrito',n.taxa_100k_ano,'district'),linha('Cidade',n.taxa_municipal_100k_ano,'city')));
+   const anos=Object.entries(n.taxa_por_ano).map(([a,t])=>`${a}: ${num.format(t)}`).join(' · ');
+   card.append(el('p',{class:'trend'},el('strong',{text:TENDENCIA[n.tendencia]||''}),el('span',{class:'muted',text:` (${anos})`})))}
+  grid.append(card)}}
+function renderFontes(fontes){const ul=$('lista-fontes');ul.replaceChildren();for(const f of fontes||[]){const data=f.data_referencia?new Date(f.data_referencia+'T12:00:00').toLocaleDateString('pt-BR'):'sem data';const li=el('li',{},el('a',{href:f.url,target:'_blank',rel:'noreferrer',text:f.fonte}),` — ${f.descricao}: ${data}${f.observacao?' ('+f.observacao+')':''}${f.licenca?'. Licença '+f.licenca:''}.`);if(f.aviso)li.append(el('strong',{text:` Aviso: ${f.aviso}.`}));ul.append(li)}}
+async function render(r,soPesos){const d=r.diagnostico;state.dados=r;state.distrito=r.local.distrito;
+ $('resultado').hidden=false;$('fora').hidden=true;
+ const titulo=state.endereco?[state.endereco.logradouro,state.endereco.bairro].filter(Boolean).join(', ')||`CEP ${state.endereco.cep}`:'Ponto escolhido no mapa';
+ $('local-titulo').textContent=titulo;$('local-distrito').textContent=`Distrito: ${state.distrito.nome}`;
+ $('local-aviso').textContent=state.endereco?'A localização obtida pelo CEP é aproximada: ela identifica o distrito, mas não a posição exata do imóvel.':'Diagnóstico do ponto clicado no mapa.';
+ renderProximidade(d.proximidade);renderVitalidade(d.vitalidade);renderOcorrencias(d.ocorrencias);renderFontes(r.fontes);
+ if(!soPesos)await desenharMapa(d)}
+
+// ---------- consulta (RF15: resultado e erros na região viva) ----------
+async function diagnosticar(alvo,soPesos=false){
+ const pedido=++state.pedido;const q=new URLSearchParams(pesos());
+ if(alvo.cep)q.set('cep',alvo.cep);else{q.set('lat',alvo.lat.toFixed(6));q.set('lon',alvo.lon.toFixed(6))}
+ $('consultar').disabled=true;anunciar(soPesos?'Recalculando os índices com as novas prioridades…':'Consultando o diagnóstico…');
+ try{const r=await getJSON('/api/diagnostico?'+q);if(pedido!==state.pedido)return;
+  if(alvo.cep){state.endereco=r.local.endereco||null}
+  if(!r.diagnostico&&!alvo.cep&&state.dados){anunciar(`${r.aviso} Escolha um ponto dentro da cidade.`,true);return}
+  if(!r.diagnostico){$('resultado').hidden=true;$('fora').hidden=false;$('fora-texto').textContent=`${r.aviso}${r.local.endereco?' ('+[r.local.endereco.logradouro,r.local.endereco.municipio].filter(Boolean).join(', ')+')':''} O diagnóstico cobre apenas os 96 distritos da capital.`;anunciar(r.aviso,true);return}
+  state.lat=r.local.latitude;state.lon=r.local.longitude;
+  await render(r,soPesos);
+  const d=r.diagnostico;anunciar(`${soPesos?'Índices recalculados':'Diagnóstico concluído'} para o distrito ${state.distrito.nome}: proximidade ${d.proximidade.ipl==null?'sem dados':num.format(d.proximidade.ipl)}, vitalidade ${num.format(d.vitalidade.ivep)}, de 100.`);
+  if(!soPesos){$('local-titulo').focus();if(alvo.cep)history.replaceState(null,'',`?cep=${alvo.cep}`)}
+ }catch(e){if(pedido===state.pedido)anunciar(e.message,true)}
+ finally{if(pedido===state.pedido)$('consultar').disabled=false}}
+
+$('cep').addEventListener('input',e=>{const d=e.target.value.replace(/\D/g,'').slice(0,8);e.target.value=d.length>5?`${d.slice(0,5)}-${d.slice(5)}`:d});
+$('form').addEventListener('submit',e=>{e.preventDefault();const cep=$('cep').value.replace(/\D/g,'');if(cep.length!==8){anunciar('O CEP deve ter 8 números.',true);$('cep').focus();return}diagnosticar({cep})});
+const inicial=new URLSearchParams(location.search).get('cep');if(inicial){$('cep').value=inicial;$('cep').dispatchEvent(new Event('input'));diagnosticar({cep:inicial.replace(/\D/g,'')})}
+</script>
+</body>
+</html>

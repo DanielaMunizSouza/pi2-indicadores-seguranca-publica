@@ -6,6 +6,9 @@ erDiagram
     DISTRITO_MUNICIPAL_SP ||..o{ EQUIPAMENTO_PUBLICO : "contém (ST_Within)"
     CARGA_ETL ||..o{ REGISTRO_OCORRENCIA : "importa (arquivo)"
     REGISTRO_OCORRENCIA }o..o{ RESUMO_OCORRENCIA_DIARIO : "resume"
+    REGISTRO_OCORRENCIA ||--o| OCORRENCIA_DISTRITO : "localizada em"
+    DISTRITO_MUNICIPAL_SP ||--o{ OCORRENCIA_DISTRITO : "recebe"
+    DISTRITO_MUNICIPAL_SP ||--o{ INDICADOR_DISTRITO : "possui"
 
     DISTRITO_MUNICIPAL_SP {
         text codigo_distrito PK
@@ -75,4 +78,16 @@ erDiagram
         bigint registros
         bigint com_cep
         bigint com_coordenada
+    }
+    OCORRENCIA_DISTRITO {
+        bigint id PK "FK registro_ocorrencia, ON DELETE CASCADE"
+        text codigo_distrito FK
+    }
+    INDICADOR_DISTRITO {
+        text codigo_distrito PK
+        text indicador PK "equipamentos, densidade_km2, densidade_10k_hab, percentil, ocorrencias"
+        text subcategoria PK "categoria de equipamento ou grupo de natureza"
+        smallint ano PK "0 quando não se aplica"
+        double valor
+        timestamptz atualizado_em
     }

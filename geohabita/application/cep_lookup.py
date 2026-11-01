@@ -12,6 +12,9 @@ from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
 
+from geohabita.domain.cep import CEP_NOT_FOUND_MESSAGE, require_valid_cep
+from geohabita.domain.freshness import is_cache_fresh
+
 PRIMARY_TIMEOUT_S = 3.0
 
 
@@ -58,4 +61,17 @@ class CepLookup:
 
     def lookup(self, raw_cep: str) -> Address:
         """Endereço do CEP; levanta InvalidCepError ou CepNotFoundError."""
-        raise NotImplementedError
+        cep = require_valid_cep(raw_cep)
+        now = self.clock()
+        cached = self.cache.get(cep)
+        if cached is not None and is_cache_fresh(cached[0], now):
+            return cached[1]
+        try:
+            address = self.primary(cep, PRIMARY_TIMEOUT_S)
+        except ProviderError:
+            # RN03: falha ou atraso do principal aciona a contingência.
+            address = self.fallback(cep, PRIMARY_TIMEOUT_S)
+        if address is None:
+            raise CepNotFoundError(CEP_NOT_FOUND_MESSAGE)
+        self.cache[cep] = (now, address)
+        return address

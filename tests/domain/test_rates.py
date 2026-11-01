@@ -66,3 +66,75 @@ def test_window_excludes_current_incomplete_year(today):
 
 def test_window_length_follows_years_argument():
     assert complete_years_window(date(2026, 6, 1), years=1) == (2025, 2025)
+
+
+# --- Grupos de natureza, tendência e aviso (RF10) ---------------------------
+
+from geohabita.domain.rates import (  # noqa: E402
+    OCCURRENCE_GROUPS,
+    SUBNOTIFICATION_NOTICE,
+    TREND_TOLERANCE,
+    occurrence_group,
+    trend_direction,
+)
+
+
+def test_specification_lists_five_occurrence_groups():
+    assert set(OCCURRENCE_GROUPS) == {"roubo", "furto", "roubo_celular", "roubo_veiculo", "crimes_contra_vida"}
+
+
+@pytest.mark.parametrize(
+    ("natureza", "grupo"),
+    [
+        ("ROUBO - OUTROS", "roubo"),
+        ("ROUBO DE CARGA", "roubo"),
+        ("ROUBO DE VEÍCULO", "roubo_veiculo"),
+        ("Roubo de Veículo", "roubo_veiculo"),
+        ("FURTO - OUTROS", "furto"),
+        ("FURTO DE VEÍCULO", "furto"),
+        ("HOMICÍDIO DOLOSO", "crimes_contra_vida"),
+        ("LATROCÍNIO", "crimes_contra_vida"),
+        ("LESÃO CORPORAL SEGUIDA DE MORTE", "crimes_contra_vida"),
+        ("LESÃO CORPORAL DOLOSA", None),
+        ("HOMICÍDIO CULPOSO POR ACIDENTE DE TRÂNSITO", None),
+        ("TRÁFICO DE ENTORPECENTES", None),
+    ],
+)
+def test_criminal_naturezas_map_to_groups(natureza, grupo):
+    assert occurrence_group("criminal", natureza, None) == grupo
+
+
+def test_phone_robbery_comes_from_the_rubrica_of_the_phone_dataset():
+    assert occurrence_group("celulares_subtraidos", "Código Penal", "Roubo (art. 157)") == "roubo_celular"
+    assert occurrence_group("celulares_subtraidos", "Código Penal", "Furto (art. 155)") is None
+    assert occurrence_group("celulares_subtraidos", "Não Criminal", "Perda/Extravio") is None
+
+
+def test_other_datasets_do_not_feed_the_rates():
+    assert occurrence_group("mdip", "MORTE DECORRENTE DE INTERVENÇÃO POLICIAL", None) is None
+
+
+def test_trend_compares_last_year_with_first():
+    assert trend_direction([100, 105, 130]) == "alta"
+    assert trend_direction([100, 95, 70]) == "queda"
+    assert trend_direction([100, 140, 105]) == "estável"
+
+
+def test_trend_tolerance_is_ten_percent():
+    assert TREND_TOLERANCE == pytest.approx(0.10)
+    assert trend_direction([100, 110]) == "alta"
+    assert trend_direction([100, 109]) == "estável"
+
+
+def test_trend_from_zero_is_rising_only_if_it_grows():
+    assert trend_direction([0, 0, 5]) == "alta"
+    assert trend_direction([0, 0, 0]) == "estável"
+
+
+def test_trend_needs_at_least_two_points():
+    with pytest.raises(ValueError):
+        trend_direction([100])
+
+
+def test_subnotification_notice_is_present():
+    assert "subnotifica" in SUBNOTIFICATION_NOTICE.lower()

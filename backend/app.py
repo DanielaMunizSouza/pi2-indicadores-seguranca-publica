@@ -1,10 +1,19 @@
-import os, re
+import json
+import os
 from datetime import date
 from pathlib import Path
 import psycopg
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from psycopg.rows import dict_row
+from geohabita.application.rate_limit import RateLimiter
+from geohabita.application.cep_lookup import CepLookup,CepNotFoundError,ProviderError
+from geohabita.domain.cep import InvalidCepError,normalize_cep,require_valid_cep
+from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE,OUT_OF_CITY_MESSAGE,is_sao_paulo
+from geohabita.application.diagnosis import DiagnosisService,LocationNotFoundError
+from geohabita.infrastructure.cep_providers import brasilapi,brasilapi_coordinates,viacep
+from geohabita.infrastructure.nominatim import NominatimGeocoder
+from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
 
 ROOT=Path(__file__).resolve().parents[1]
 # Read local configuration when present; environment variables still take precedence.
@@ -18,6 +27,17 @@ DB_URL=os.getenv("DATABASE_URL","postgresql://postgres@localhost:5432/ProjetoInt
 MUNICIPIOS_SP=["São Paulo","S.PAULO","SAO PAULO","SÃO PAULO"]  # "São Paulo" é a forma gravada pelo importador
 CATEGORIES={"objetos":"Objetos","celulares_subtraidos":"Celulares subtraídos","apreensao_entorpecente":"Apreensão de entorpecentes","entorpecentes_gramas":"Entorpecentes (gramas)","veiculos":"Veículos subtraídos","veiculos_recuperados":"Veículos recuperados","criminal":"Dados criminais (SPDados)","mdip":"Mortes decorrentes de intervenção policial","prisoes":"Prisões efetuadas","presos_apreendidos":"Presos e apreendidos","armas_apreendidas":"Armas de fogo apreendidas","flagrantes":"Flagrantes lavrados","apreensao_eca":"Apreensões (art. 173 ECA)","outros":"Outros"}
 app=FastAPI(title="Indicadores de Segurança Pública — São Paulo",version="1.0.0",description="Resumos agregados por período, categoria e localização.")
+
+rate_limiter=RateLimiter()
+
+@app.middleware("http")
+async def limit_api_requests(request:Request,call_next):
+    # RNF08: 60 requisições por minuto por IP nas rotas públicas da API.
+    # Atrás de um proxy reverso, o IP do cliente deve vir do próprio proxy.
+    client=request.client.host if request.client else "desconhecido"
+    if request.url.path.startswith("/api/") and not rate_limiter.allow(client):
+        return JSONResponse({"detail":"Muitas requisições. Aguarde um minuto e tente novamente."},status_code=429,headers={"Retry-After":"60"})
+    return await call_next(request)
 
 def connect():
     try: return psycopg.connect(DB_URL,connect_timeout=5,row_factory=dict_row)
@@ -34,14 +54,17 @@ def make_where(start,end,cep,category,include_city=True):
     clauses.extend(["data_ocorrencia >= %s","data_ocorrencia <= %s"])
     values.extend([start,end])
     if cep:
-        digits=re.sub(r"\D","",cep)
-        if len(digits)!=8: raise HTTPException(400,"Digite um CEP com 8 dígitos.")
+        try: digits=require_valid_cep(cep)
+        except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
         clauses.append("cep = %s"); values.append(digits)
     if category: clauses.append("categoria_dado = %s"); values.append(category)
     return " AND ".join(clauses),values
 
 @app.get("/",include_in_schema=False)
-def home(): return FileResponse(ROOT/"frontend"/"index.html")
+def home(): return FileResponse(ROOT/"frontend"/"diagnostico.html")
+
+@app.get("/explorar",include_in_schema=False)
+def explorar(): return FileResponse(ROOT/"frontend"/"explorar.html")
 
 @app.get("/api/status")
 def status():
@@ -49,8 +72,64 @@ def status():
         row=conn.execute("SELECT PostGIS_Full_Version() AS postgis, EXISTS(SELECT 1 FROM public.registro_ocorrencia LIMIT 1) AS tem_registros").fetchone()
     return {"banco":"conectado",**row}
 
+# ViaCEP é o serviço principal; a BrasilAPI responde quando ele falha ou demora (RN03).
+cep_service=CepLookup(viacep,brasilapi)
+
+@app.get("/api/cep/{cep}")
+def cep_address(cep:str):
+    try: address=cep_service.lookup(cep)
+    except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
+    except CepNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
+    except ProviderError as exc: raise HTTPException(503,"Os serviços de CEP estão indisponíveis. Tente novamente em instantes.") from exc
+    inside=is_sao_paulo(address.ibge_code)
+    return {"cep":address.cep,"logradouro":address.street,"bairro":address.neighbourhood,"municipio":address.city,
+      "dentro_sao_paulo":inside,"aviso":None if inside else OUT_OF_CITY_MESSAGE,
+      "latitude":address.latitude,"longitude":address.longitude,"nota_localizacao":APPROXIMATE_LOCATION_NOTICE}
+
+# Diagnóstico socioespacial (UC02): proximidade e IPL, vitalidade e IVEP, ocorrências.
+# O ViaCEP não traz coordenadas: elas vêm dos geocodificadores abaixo, em ordem.
+diagnosis_repository=PostgisDiagnosisRepository(connect)
+# Ordem: coordenada específica da BrasilAPI; mediana das ocorrências com o mesmo CEP;
+# logradouro no Nominatim (OpenStreetMap).
+diagnosis_service=DiagnosisService(diagnosis_repository,cep_service,geocoders=[
+    ("brasilapi",lambda endereco: brasilapi_coordinates(endereco.cep)),
+    ("registros_ssp",lambda endereco: diagnosis_repository.cep_centroid(endereco.cep,endereco.street)),
+    ("openstreetmap",NominatimGeocoder())])
+def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetros os confunde
+    return Query(1,ge=0,le=5,description="Peso da categoria, inteiro de 0 a 5 (RN06).")
+
+@app.get("/api/diagnostico")
+def diagnostico(cep:str|None=Query(None,description="CEP do endereço (8 dígitos)."),
+                lat:float|None=Query(None,ge=-90,le=90),lon:float|None=Query(None,ge=-180,le=180),
+                peso_lazer_convivencia:int=peso(),peso_cultura_esporte:int=peso(),peso_mobilidade:int=peso(),
+                peso_comercio_rua:int=peso(),peso_servicos_essenciais:int=peso(),peso_conectividade:int=peso()):
+    """Diagnóstico de um CEP ou de uma coordenada, em três blocos independentes (RN07)."""
+    pesos={"lazer_convivencia":peso_lazer_convivencia,"cultura_esporte":peso_cultura_esporte,
+           "mobilidade":peso_mobilidade,"comercio_rua":peso_comercio_rua,
+           "servicos_essenciais":peso_servicos_essenciais,"conectividade":peso_conectividade}
+    if (cep is None)==(lat is None or lon is None):
+        raise HTTPException(400,"Informe o CEP ou a latitude e a longitude.")
+    try:
+        if cep is not None: return diagnosis_service.diagnose_cep(cep,pesos)
+        return diagnosis_service.diagnose_point(lat,lon,pesos)
+    except InvalidCepError as exc: raise HTTPException(400,str(exc)) from exc
+    except ValueError as exc: raise HTTPException(400,str(exc)) from exc
+    except CepNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
+    except LocationNotFoundError as exc: raise HTTPException(422,str(exc)) from exc
+    except ProviderError as exc: raise HTTPException(503,"Os serviços de CEP estão indisponíveis. Tente novamente em instantes.") from exc
+
 @app.get("/api/categories")
 def categories(): return [{"value":k,"label":v} for k,v in CATEGORIES.items()]
+
+@app.get("/api/distritos/{codigo}/limite",include_in_schema=False)
+def district_boundary(codigo:str):
+    """Limite de um distrito em GeoJSON, simplificado (~5 m) para o mapa do diagnóstico."""
+    with connect() as conn:
+        row=conn.execute("""SELECT nome_distrito,ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometria,0.00005),6) AS g
+            FROM public.distrito_municipal_sp WHERE codigo_distrito=%s""",(codigo,)).fetchone()
+    if not row: raise HTTPException(404,"Distrito não encontrado.")
+    return JSONResponse({"type":"Feature","properties":{"codigo":codigo,"nome":row["nome_distrito"]},
+                         "geometry":json.loads(row["g"])},media_type="application/geo+json")
 
 @app.get("/api/areas/geometry",include_in_schema=False)
 def area_geometry():
@@ -99,7 +178,7 @@ def area_stats(start:date=Query(date(2025,1,1)),end:date=Query(date(2026,12,31))
     cep_area=None
     cep_distrito=None
     if cep:
-        cep_digitos=re.sub(r"\D","",cep)
+        cep_digitos=normalize_cep(cep)
     try:
         with connect() as conn:
             if cep:
