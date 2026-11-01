@@ -1,0 +1,76 @@
+%% Processo de população do banco (scripts/pipeline_dados.py).
+%% Renderizar: mmdc -i pipeline_dados.mmd -o pipeline_dados.png
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+    %% ---------- fontes externas ----------
+    subgraph FONTES["Fontes públicas"]
+        REF[/"data/reference/<br/>distritos_sp.geojson"/]
+        WFS(["GeoSampa WFS<br/>16 camadas de equipamentos"])
+        IBGE(["IBGE FTP<br/>Censo 2022 por distrito"])
+        SSP(["SSP-SP transparência<br/>SPDadosCriminais · Celulares · MDIP<br/>3 últimos anos completos"])
+    end
+
+    %% ---------- trilha 1: distritos + população ----------
+    subgraph T1["Trilha 1"]
+        DIST["distritos"]
+        POP["ibge-populacao<br/><i>casa pelo nome sem acento</i>"]
+    end
+
+    %% ---------- trilha 2: GeoSampa ----------
+    subgraph T2["Trilha 2: equipamentos"]
+        GB["geosampa-baixar<br/><i>4 camadas por vez · paginação 5.000<br/>camadas com erro são puladas</i>"]
+        GJ[/"data/raw/geosampa/*.geojson"/]
+        GC["geosampa-carregar<br/><i>1 conexão por camada · lotes de 20.000</i>"]
+    end
+
+    %% ---------- trilha 3: SSP ----------
+    subgraph T3["Trilha 3: ocorrências"]
+        HEAD{"mudou?<br/><i>Last-Modified + tamanho<br/>(manifesto.json)</i>"}
+        DL["download<br/><i>2 por vez · retomável</i>"]
+        CONV["conversão XLSX → CSV<br/><i>N processos · só a capital (IBGE 3550308)<br/>abas de dicionário à parte · XLSX apagado</i>"]
+        CSV[/"data/raw/ssp/csv/*.csv"/]
+        SIG{"conteúdo novo?<br/><i>SHA-1 × carga_etl</i>"}
+        LOAD["ssp-carregar<br/><i>N processos · 1 transação por arquivo<br/>DELETE + COPY</i>"]
+        SYNC["remove do banco arquivos<br/>que saíram do escopo"]
+    end
+
+    RES["resumo<br/><i>ponto-em-polígono PostGIS</i>"]
+
+    %% ---------- tabelas ----------
+    subgraph DB["PostgreSQL / PostGIS"]
+        TD[("distrito_municipal_sp")]
+        TE[("equipamento_publico")]
+        TO[("registro_ocorrencia")]
+        TC[("carga_etl")]
+        TR[("resumo_distrito_diario<br/>resumo_ocorrencia_diario")]
+    end
+
+    REF --> DIST --> TD
+    DIST --> POP
+    IBGE --> POP -->|populacao_2022| TD
+
+    WFS --> GB --> GJ --> GC --> TE
+
+    SSP --> HEAD
+    HEAD -->|sim| DL --> CONV --> CSV
+    HEAD -->|não / SSP fora do ar| CSV
+    CSV --> SIG
+    SIG -->|sim| LOAD
+    SIG -->|não| PULA(["pulado"])
+    LOAD --> TO
+    LOAD --> TC
+    SYNC --> TO
+    SYNC --> TC
+    CSV -.->|"manifesto (antes da carga)"| SYNC
+
+    %% setas grossas: o resumo só começa depois destas etapas
+    DIST ==> RES
+    LOAD ==> RES
+    TO --> RES
+    TD --> RES
+    RES --> TR
+
+    classDef etapa fill:#e8f0fe,stroke:#3367d6
+    classDef arquivo fill:#fff4e5,stroke:#e8a33d
+    class DIST,POP,GB,GC,DL,CONV,LOAD,SYNC,RES etapa
+    class REF,GJ,CSV arquivo
