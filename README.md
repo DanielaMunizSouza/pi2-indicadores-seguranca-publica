@@ -60,24 +60,31 @@ navegador ──HTTPS──> borda Cloudflare ──túnel──> cloudflared �
 
 O `cloudflared` abre a conexão de saída até a Cloudflare, então nada no servidor fica exposto: `compose.yml` publica a aplicação e o banco só em `127.0.0.1` (portas `APP_PORT` e `DB_PORT`), para uso local e pelo pgAdmin.
 
+O túnel pode rodar de duas formas. As duas usam o mesmo `compose.yml`:
+
+- **Túnel no próprio servidor**: é o caso do GeoHabita hoje. O túnel é criado pela linha de comando (`cloudflared tunnel create`), com as rotas em `~/.cloudflared/config.yml`, e o `cloudflared` roda como serviço do sistema. Basta apontar o hostname para `http://127.0.0.1:8000` e subir o Compose sem o perfil `tunel`. Nenhum token é necessário.
+- **Túnel em contêiner**: o túnel é criado no painel Zero Trust e o `cloudflared` sobe junto com o Compose no perfil `tunel`, autenticado por `CLOUDFLARE_TUNNEL_TOKEN`.
+
 Passo a passo, com Docker e o plugin Compose instalados:
 
-1. No painel Zero Trust da Cloudflare, em Networks > Tunnels, crie um túnel do tipo Cloudflared e copie o token exibido no comando de instalação.
-2. Crie `.env` a partir de `.env.example`, defina `POSTGRES_PASSWORD` (sem `@ : / ? #`, porque ela também compõe a URL de conexão) e preencha `CLOUDFLARE_TUNNEL_TOKEN`.
-3. No túnel, adicione um hostname público (por exemplo `geohabita.seudominio.com.br`) com o serviço `http://app:8000`.
-4. Suba banco, aplicação e túnel com um comando:
+1. Crie `.env` a partir de `.env.example` e defina `POSTGRES_PASSWORD`, sem `@ : / ? #`, porque a senha também compõe a URL de conexão.
+2. Configure o túnel:
+   - **No servidor**: no `config.yml` do `cloudflared`, a regra de `ingress` do hostname público aponta para `service: http://127.0.0.1:8000` (ou para a porta definida em `APP_PORT`). Mantenha o `cloudflared` rodando como serviço (`cloudflared service install`, ou uma unidade do systemd).
+   - **Em contêiner**: no painel Zero Trust, em Networks > Tunnels, crie um túnel do tipo Cloudflared. Copie o token do comando de instalação (o trecho que começa com `eyJ`) para `CLOUDFLARE_TUNNEL_TOKEN` no `.env`. Depois adicione um hostname público com o serviço `http://app:8000`.
+3. Suba os serviços com um comando:
 
    ```bash
-   docker compose --profile tunel up -d --build
+   docker compose up -d --build                    # túnel no servidor
+   docker compose --profile tunel up -d --build    # túnel em contêiner
    ```
 
-5. Popule o banco (a primeira vez leva de meia hora a uma hora; os arquivos baixados ficam em `data/raw` do servidor):
+4. Popule o banco (a primeira vez leva de meia hora a uma hora; os arquivos baixados ficam em `data/raw` do servidor):
 
    ```bash
    docker compose --profile pipeline run --rm pipeline
    ```
 
-6. Agende a atualização periódica, por exemplo semanal, no cron do servidor: `0 3 * * 1 cd /caminho/do/projeto && docker compose --profile pipeline run --rm -T pipeline python scripts/pipeline_dados.py --etapas ssp-baixar ssp-carregar resumo indicadores >> pipeline.log 2>&1`. Argumentos depois do nome do serviço substituem o comando inteiro, por isso o comando é repetido antes das opções.
+5. Agende a atualização periódica, por exemplo semanal, no cron do servidor: `0 3 * * 1 cd /caminho/do/projeto && docker compose --profile pipeline run --rm -T pipeline python scripts/pipeline_dados.py --etapas ssp-baixar ssp-carregar resumo indicadores >> pipeline.log 2>&1`. Argumentos depois do nome do serviço substituem o comando inteiro, por isso o comando é repetido antes das opções.
 
 Sem o perfil `tunel`, `docker compose up -d --build` sobe só banco e aplicação, acessível em http://127.0.0.1:8000. O banco de `compose.yml` usa a mesma porta 5433 do Compose de `database/`, que continua funcionando para quem só precisa do banco; pare um antes de subir o outro. Os volumes são diferentes, então o novo banco começa vazio.
 
@@ -88,7 +95,9 @@ O que cada lado cobre:
 
 Limites assumidos: a disponibilidade depende do servidor da equipe (energia, rede e manutenção); não há réplica nem failover, e a meta de disponibilidade do RNF07 fica como trabalho futuro.
 
-O IP do visitante chega no cabeçalho `CF-Connecting-IP`, usado pelo limite de requisições. Como qualquer cliente pode enviar esse cabeçalho, ele só é aceito de conexões vindas de proxies confiáveis, listados em `GEOHABITA_PROXIES_CONFIAVEIS` (IPs ou CIDRs separados por vírgula; padrão `127.0.0.1,::1`, para o `cloudflared` instalado na mesma máquina). No Compose, o `cloudflared` tem o IP fixo 172.28.0.10 na rede `geohabita`, e `compose.yml` já define esse valor para a aplicação.
+O IP do visitante chega no cabeçalho `CF-Connecting-IP`, usado pelo limite de requisições. Como qualquer cliente pode enviar esse cabeçalho, ele só é aceito de conexões vindas de proxies confiáveis, listados em `GEOHABITA_PROXIES_CONFIAVEIS` (IPs ou CIDRs separados por vírgula; padrão `127.0.0.1,::1`, para o `cloudflared` instalado na mesma máquina). No Compose, a aplicação já confia em duas origens da rede `geohabita`, as duas com IP fixo:
+- `172.28.0.10`, o contêiner `cloudflared` do perfil `tunel`;
+- `172.28.0.1`, o gateway da rede. É dele que vêm as conexões feitas pela porta publicada em `127.0.0.1`, como as de um `cloudflared` instalado no servidor. Só processos da própria máquina alcançam essa porta.
 
 ## Integração contínua
 
