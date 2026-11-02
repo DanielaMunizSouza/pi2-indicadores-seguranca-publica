@@ -5,13 +5,15 @@ e os repositórios da infraestrutura e converte erros em códigos de status.
 Consultas SQL e chamadas externas ficam em ``geohabita.infrastructure``.
 """
 
+import hashlib
 import logging
+import re
 from dataclasses import asdict
 from datetime import date
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from geohabita.application.address_search import AddressSearch
@@ -98,14 +100,46 @@ occurrence_repository = PostgisOccurrenceRepository(lambda: connect())
 app.mount("/static", StaticFiles(directory=ROOT / "frontend"), name="static")
 
 
+def asset_version(folder=ROOT / "frontend") -> str:
+    """Hash do CSS e do JavaScript: muda sempre que algum desses arquivos muda."""
+    digest = hashlib.sha1()
+    for path in sorted(folder.glob("*/*")):
+        if path.suffix in (".css", ".js"):
+            digest.update(path.name.encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+ASSET_VERSION = asset_version()
+_ASSET_LINK = re.compile(r'(/static/[\w/.-]+\.(?:css|js))"')
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
+def page(name: str) -> HTMLResponse:
+    """Página com o endereço do CSS e do JS versionado, para a borda da Cloudflare
+    e o navegador nunca servirem uma versão antiga depois de um deploy."""
+    html = (ROOT / "frontend" / name).read_text(encoding="utf-8")
+    return HTMLResponse(_ASSET_LINK.sub(rf'\1?v={ASSET_VERSION}"', html), headers=NO_CACHE)
+
+
+@app.middleware("http")
+async def revalidate_static(request: Request, call_next):
+    # Módulos importados pelo JavaScript não levam versão no endereço: com no-cache,
+    # a borda e o navegador revalidam (ETag) a cada uso, sem baixar de novo se não mudou.
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers.update(NO_CACHE)
+    return response
+
+
 @app.get("/", include_in_schema=False)
 def home():
-    return FileResponse(ROOT / "frontend" / "diagnostico.html")
+    return page("diagnostico.html")
 
 
 @app.get("/explorar", include_in_schema=False)
 def explorar():
-    return FileResponse(ROOT / "frontend" / "explorar.html")
+    return page("explorar.html")
 
 
 @app.get("/api/status")
