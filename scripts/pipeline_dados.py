@@ -53,10 +53,10 @@ DOWNLOADS_GEOSAMPA = 4  # requisições simultâneas ao WFS da Prefeitura
 
 # camada GeoSampa -> (categoria do IVEP, tipo de equipamento). Categorias e tipos seguem
 # geohabita/domain/thresholds.py. Fora da lista: "praca" (a camada GEOSAMPA_v_praca_largo falha
-# no servidor do GeoSampa por erro de certificado; tente de novo mais tarde).
+# no servidor do GeoSampa por erro de certificado; tente de novo mais tarde) e
+# "GEOSAMPA_cadparcs_parque_unidade_conservacao" (não existe mais no WFS).
 CAMADAS = {
     "pde_parque_municipal": ("lazer_convivencia", "parque_area_verde"),
-    "GEOSAMPA_cadparcs_parque_unidade_conservacao": ("lazer_convivencia", "parque_area_verde"),
     "equipamento_cultura_bibliotecas": ("cultura_esporte", "biblioteca_centro_cultural"),
     "equipamento_cultura_espacos_culturais": ("cultura_esporte", "biblioteca_centro_cultural"),
     "equipamento_educacao_ceu": ("cultura_esporte", "ceu_equipamento_esportivo"),
@@ -190,12 +190,28 @@ SQL_EQUIPAMENTO = (
     "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,importado_em=now()")
 
 
+def existe(camada, props) -> bool:
+    """A feição representa um equipamento que existe hoje.
+
+    A camada de parques do Plano Diretor mistura parques existentes e propostos
+    (``tx_tipo_situacao_projeto``); um parque proposto ainda não existe e não pode
+    contar na proximidade nem na vitalidade.
+    """
+    if camada == "pde_parque_municipal":
+        return props.get("tx_tipo_situacao_projeto") == "Existente"
+    return True
+
+
 def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
-    """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10)."""
+    """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10).
+
+    Linhas da camada que já estavam no banco e não vieram nesta carga (removidas
+    da fonte ou descartadas pelo filtro) são apagadas.
+    """
     feicoes = json.loads(arquivo.read_text(encoding="utf-8"))["features"]
     linhas = []
     for i, f in enumerate(feicoes):
-        if not f.get("geometry"):
+        if not f.get("geometry") or not existe(camada, f["properties"]):
             continue
         p = f["properties"]
         ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia",
@@ -212,7 +228,9 @@ def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
             with conn.transaction(), conn.cursor() as cur:
                 cur.executemany(SQL_EQUIPAMENTO, linhas[i:i + LOTE])
             progresso.avanco(chave, feito=min(i + LOTE, len(linhas)))
-    conservados = len(linhas)  # linhas sem geometria já ficaram fora, acima
+        conn.execute("DELETE FROM public.equipamento_publico WHERE camada = %s AND NOT (identificador = ANY(%s))",
+                     (camada, [linha[3] for linha in linhas]))
+    conservados = len(linhas)  # linhas sem geometria ou que não existem já ficaram fora, acima
     progresso.fim(chave, f"{camada}: {len(linhas):,} equipamentos")
     return conservados
 
