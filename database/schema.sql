@@ -103,3 +103,9 @@ CREATE TABLE IF NOT EXISTS public.indicador_distrito (
 -- Busca de vizinhos do diagnóstico sem percorrer os ~663 mil postes de iluminação.
 CREATE INDEX IF NOT EXISTS ix_equipamento_geometria_diagnostico ON public.equipamento_publico
  USING gist(geometria) WHERE tipo <> 'iluminacao_publica';
+-- Cache de 30 dias das consultas externas de CEP e geocodificação (RN04), que
+-- sobrevive a reinícios da aplicação. Guarda só o endereço consultado, nunca quem consultou (RNF15).
+CREATE TABLE IF NOT EXISTS public.cache_consulta (
+ espaco text NOT NULL, chave text NOT NULL, valor jsonb, obtido_em timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(espaco,chave)
+);

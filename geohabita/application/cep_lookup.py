@@ -29,6 +29,7 @@ class Address:
     ibge_code: str
     latitude: float | None = None
     longitude: float | None = None
+    number: str = ""  # número do imóvel, quando informado pelo usuário
 
 
 class ProviderError(Exception):

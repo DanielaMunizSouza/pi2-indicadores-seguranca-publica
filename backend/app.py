@@ -6,19 +6,22 @@ Consultas SQL e chamadas externas ficam em ``geohabita.infrastructure``.
 """
 
 import logging
+from dataclasses import asdict
 from datetime import date
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from geohabita.application.cep_lookup import CepLookup, CepNotFoundError, ProviderError
+from geohabita.application.cep_lookup import Address, CepLookup, CepNotFoundError, ProviderError
 from geohabita.application.diagnosis import DiagnosisService, LocationNotFoundError
+from geohabita.application.geocoding import CachedGeocoder, decode_point, encode_point
 from geohabita.application.rate_limit import RateLimiter
 from geohabita.config import DATABASE_URL as DB_URL, ROOT, TRUSTED_PROXIES, is_trusted
 from geohabita.domain.cep import InvalidCepError, require_valid_cep
 from geohabita.domain.ssp import DATASET_LABELS as CATEGORIES, rate_per_100k
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE, is_sao_paulo
+from geohabita.infrastructure.cache import PersistentCache
 from geohabita.infrastructure.cep_providers import brasilapi, brasilapi_coordinates, viacep
 from geohabita.infrastructure.database import DatabaseUnavailable, connector
 from geohabita.infrastructure.nominatim import NominatimGeocoder
@@ -97,7 +100,9 @@ def status():
 
 
 # ViaCEP é o serviço principal; a BrasilAPI responde quando ele falha ou demora (RN03).
-cep_service = CepLookup(viacep, brasilapi)
+# Endereços e coordenadas ficam 30 dias no banco (RN04).
+cep_service = CepLookup(viacep, brasilapi, cache=PersistentCache(
+    connect, "cep", encode=asdict, decode=lambda d: Address(**d)))
 
 
 @app.get("/api/cep/{cep}")
@@ -123,10 +128,15 @@ def cep_address(cep: str):
 diagnosis_repository = PostgisDiagnosisRepository(lambda: connect())
 # Ordem: coordenada específica da BrasilAPI; mediana das ocorrências com o mesmo CEP;
 # logradouro no Nominatim (OpenStreetMap).
+def point_cache(namespace: str) -> PersistentCache:
+    return PersistentCache(connect, namespace, encode=encode_point, decode=decode_point)
+
+
 diagnosis_service = DiagnosisService(diagnosis_repository, cep_service, geocoders=[
-    ("brasilapi", lambda endereco: brasilapi_coordinates(endereco.cep)),
+    ("brasilapi", CachedGeocoder(lambda endereco: brasilapi_coordinates(endereco.cep, raise_errors=True),
+                                 point_cache("brasilapi"), key=lambda endereco: endereco.cep)),
     ("registros_ssp", lambda endereco: diagnosis_repository.cep_centroid(endereco.cep, endereco.street)),
-    ("openstreetmap", NominatimGeocoder())])
+    ("openstreetmap", NominatimGeocoder(cache=point_cache("nominatim")))])
 
 
 def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetros os confunde

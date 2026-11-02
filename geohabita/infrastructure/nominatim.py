@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
@@ -34,16 +34,17 @@ class NominatimGeocoder:
     def __init__(self, fetch: Callable[[dict[str, str]], list[dict[str, Any]]] = _fetch,
                  clock: Callable[[], datetime] = datetime.now,
                  monotonic: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 cache: MutableMapping[str, tuple[datetime, tuple[float, float] | None]] | None = None) -> None:
         self.fetch, self.clock, self.monotonic, self.sleep = fetch, clock, monotonic, sleep
-        self.cache: dict[tuple[str, str], tuple[datetime, tuple[float, float] | None]] = {}
+        self.cache = {} if cache is None else cache  # persistente na aplicação (RN04)
         self._lock = threading.Lock()
         self._last: float | None = None
 
     def __call__(self, address: Address) -> tuple[float, float] | None:
         if not address.street:
             return None
-        key = (address.street, address.city)
+        key = f"{address.street}|{address.city}"
         cached = self.cache.get(key)
         if cached and is_cache_fresh(cached[0], self.clock()):
             return cached[1]
