@@ -22,6 +22,7 @@ from geohabita.application.rate_limit import RateLimiter
 from geohabita.config import DATABASE_URL as DB_URL, ROOT, TRUSTED_PROXIES, is_trusted
 from geohabita.domain.address import InvalidAddressError
 from geohabita.domain.cep import InvalidCepError, require_valid_cep
+from geohabita.domain.thresholds import ThresholdConfigError, load_thresholds
 from geohabita.domain.ssp import DATASET_LABELS as CATEGORIES, rate_per_100k
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE, is_sao_paulo
 from geohabita.infrastructure.cache import PersistentCache
@@ -30,6 +31,12 @@ from geohabita.infrastructure.database import DatabaseUnavailable, connector
 from geohabita.infrastructure.nominatim import NominatimClient, NominatimGeocoder, free_search
 from geohabita.infrastructure.ocorrencias import OccurrenceFilter, PostgisOccurrenceRepository
 from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
+
+# Limiares do administrador, se houver arquivo; a API e o pipeline leem o mesmo (RN13).
+try:
+    load_thresholds()
+except ThresholdConfigError as erro:  # configuração inválida: segue com os valores da especificação
+    logging.getLogger("geohabita").warning("limiares de config/limiares.toml ignorados: %s", erro)
 
 app = FastAPI(title="GeoHabita — Diagnóstico socioespacial de São Paulo", version="1.0.0",
               description="Diagnóstico de endereço (proximidade, vitalidade e ocorrências oficiais) e "

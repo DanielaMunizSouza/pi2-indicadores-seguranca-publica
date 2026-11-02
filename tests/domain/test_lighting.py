@@ -2,12 +2,9 @@
 
 import pytest
 
-from geohabita.domain.lighting import (
-    LIGHTING_FULL_DENSITY,
-    LIGHTING_ZERO_DENSITY,
-    lighting_density,
-    lighting_note,
-)
+from geohabita.domain.lighting import lighting_density, lighting_note
+from geohabita.domain.thresholds import PADRAO_CEM as LIGHTING_FULL_DENSITY
+from geohabita.domain.thresholds import PADRAO_ZERO as LIGHTING_ZERO_DENSITY
 
 
 def test_density_is_points_per_square_kilometer_in_the_neighbourhood():

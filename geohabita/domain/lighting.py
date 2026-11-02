@@ -12,31 +12,29 @@ from __future__ import annotations
 
 import math
 
-LIGHTING_TYPE = "iluminacao_publica"
-LIGHTING_RADIUS_M = 300
-LIGHTING_AREA_KM2 = math.pi * LIGHTING_RADIUS_M**2 / 1e6
+from geohabita.domain.thresholds import DENSITY_THRESHOLDS, LIGHTING_TYPE
 
-# Densidades, em pontos por km², abaixo e acima das quais a nota é zero e cem.
-# Calibradas sobre a cidade real: a densidade distrital mediana é ~655/km² e a
-# mediana no raio de 300 m, ~400/km²; periferias sem cadastro ficam perto de
-# zero e o centro passa de 2.000/km². São parâmetros de configuração, a rever
-# com os testes com moradores (como os limiares do IPL).
-LIGHTING_ZERO_DENSITY = 150
-LIGHTING_FULL_DENSITY = 1500
-LIGHTING_UNAVAILABLE_MESSAGE = "sem dados de iluminação na fonte para este entorno"
+def lighting_thresholds() -> tuple[int, float, float]:
+    """(raio em metros, densidade zero, densidade cem) da iluminação pública."""
+    valores = DENSITY_THRESHOLDS[LIGHTING_TYPE]
+    return valores.radius_m, valores.zero_per_km2, valores.full_per_km2
 
 
-def lighting_density(count: int, radius_m: float = LIGHTING_RADIUS_M) -> float:
+def lighting_density(count: int, radius_m: float | None = None) -> float:
     """Pontos de iluminação por km² no círculo de ``radius_m`` em torno do endereço."""
-    return count / (math.pi * radius_m**2 / 1e6)
+    raio = lighting_thresholds()[0] if radius_m is None else radius_m
+    return count / (math.pi * raio**2 / 1e6)
 
 
-def lighting_note(density: float, zero: float = LIGHTING_ZERO_DENSITY, full: float = LIGHTING_FULL_DENSITY) -> float:
-    """Nota de 0 a 100 da densidade de iluminação, na mesma forma da nota por tipo (RN13).
+def lighting_note(density: float, zero: float | None = None, full: float | None = None) -> float:
+    """Nota de 0 a 100 da densidade de iluminação, na forma da nota por tipo (RN13).
 
-    Abaixo de ``zero`` pontos por km² a nota é 0; acima de ``full``, é 100; no meio,
-    cresce linearmente. Densidade ausente (``None``) resulta em 0.
+    Abaixo de ``zero`` pontos por km² a nota é 0; acima de ``full``, é 100; no
+    meio, cresce linearmente. Densidade ausente (``None``) resulta em 0.
     """
+    _, padrao_zero, padrao_cem = lighting_thresholds()
+    zero = padrao_zero if zero is None else zero
+    full = padrao_cem if full is None else full
     if density is None:
         return 0.0
     if density <= zero:

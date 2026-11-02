@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from geohabita.domain.thresholds import LIGHTING_TYPE
+
 LISTING_RADII_M: tuple[int, ...] = (500, 1000)
 
 # Categoria de cada tipo de equipamento do Quadro de limiares.
@@ -26,7 +28,7 @@ EQUIPMENT_CATEGORY: dict[str, str] = {
     "unidade_basica_saude": "servicos_essenciais",
     "escola_publica": "servicos_essenciais",
     "wifi_publico": "conectividade",
-    "iluminacao_publica": "conectividade",
+    LIGHTING_TYPE: "conectividade",
 }
 
 

@@ -28,12 +28,7 @@ from geohabita.domain.equipment import (
     missing_type_message,
     within_radius,
 )
-from geohabita.domain.lighting import (
-    LIGHTING_RADIUS_M,
-    LIGHTING_TYPE,
-    lighting_density,
-    lighting_note,
-)
+from geohabita.domain.lighting import LIGHTING_TYPE, lighting_density, lighting_note, lighting_thresholds
 from geohabita.domain.proximity import (
     category_note,
     local_proximity_index,
@@ -203,7 +198,8 @@ class DiagnosisService:
         # Os tipos medidos por distância são os que o banco consulta por vizinho mais próximo.
         por_distancia = sorted(available - DENSITY_TYPES)
         nearest = {e.type: e for e in self.repository.nearest_by_type(latitude, longitude, por_distancia)}
-        iluminacao = self.repository.lighting_within(latitude, longitude, LIGHTING_RADIUS_M)
+        raio_ilum, _, _ = lighting_thresholds()
+        iluminacao = self.repository.lighting_within(latitude, longitude, raio_ilum)
         around = self.repository.equipment_within(latitude, longitude, max(LISTING_RADII_M), por_distancia)
         tipos: dict[str, dict[str, Any]] = {}
         for tipo in EQUIPMENT_TYPES:
@@ -219,14 +215,14 @@ class DiagnosisService:
                                           "pontos_no_raio": None, "densidade_km2": None,
                                           "aviso": UNAVAILABLE_LAYER_MESSAGE}
                     continue
-                densidade = lighting_density(iluminacao, LIGHTING_RADIUS_M)
+                densidade = lighting_density(iluminacao, raio_ilum)
                 nota_ilum = lighting_note(densidade)
                 tipos[tipo] = info | {
                     "nota": round(nota_ilum, 1), "distancia_m": None, "medida": LIGHTING_LABEL,
                     "nome": None, "latitude": None, "longitude": None, "tempo_caminhada_min": None,
-                    "ate_500m": None, "ate_1km": None, "raio_medida_m": LIGHTING_RADIUS_M,
+                    "ate_500m": None, "ate_1km": None, "raio_medida_m": raio_ilum,
                     "pontos_no_raio": iluminacao, "densidade_km2": round(densidade),
-                    "aviso": missing_lighting_message(LIGHTING_RADIUS_M) if iluminacao == 0 else None,
+                    "aviso": missing_lighting_message(raio_ilum) if iluminacao == 0 else None,
                 }
                 continue
             if tipo not in available:

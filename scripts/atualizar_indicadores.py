@@ -24,9 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from geohabita.config import DATABASE_URL as DB_URL  # noqa: E402
 from geohabita.domain.equipment import EQUIPMENT_CATEGORY  # noqa: E402
-from geohabita.domain.lighting import LIGHTING_TYPE  # noqa: E402
 from geohabita.domain.rates import occurrence_group  # noqa: E402
-from geohabita.domain.thresholds import CATEGORIES, EQUIPMENT_THRESHOLDS  # noqa: E402
+from geohabita.domain.thresholds import CATEGORIES, LIGHTING_TYPE, load_thresholds  # noqa: E402
 from geohabita.domain.vitality import category_percentile, percentile_ranks, type_percentile  # noqa: E402
 
 # Tipos medidos apenas pela densidade por área: a oferta por habitante não faz
@@ -106,6 +105,9 @@ def occurrence_rows(conn):
 
 
 def main() -> None:
+    arquivo = load_thresholds()
+    if arquivo:
+        print(f"Limiares aplicados de {arquivo}.")
     with psycopg.connect(DB_URL) as conn:
         linhas = equipment_rows(conn) + occurrence_rows(conn)
         with conn.transaction():
