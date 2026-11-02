@@ -62,10 +62,20 @@ def percentile_ranks(values: Mapping[K, float]) -> dict[K, float]:
     return ranks
 
 
-def category_percentile(area_percentile: float, population_percentile: float) -> float:
-    """Percentil da categoria no distrito (``P_k,d``).
+def type_percentile(area_percentile: float, population_percentile: float) -> float:
+    """Percentil de um tipo de equipamento no distrito.
 
     A especificação mede a oferta por quilômetro quadrado e por dez mil
     habitantes; as duas posições percentis pesam igualmente.
     """
     return (area_percentile + population_percentile) / 2
+
+
+def category_percentile(type_percentiles: Sequence[float]) -> float:
+    """Percentil da categoria (``P_k,d``): média dos percentis dos seus tipos.
+
+    A média por tipo, e não por contagem somada, evita que um tipo muito denso
+    — os postes de iluminação, por exemplo — afogue os demais da categoria.
+    Tipos medidos só por área (iluminação) chegam com o percentil de área.
+    """
+    return sum(type_percentiles) / len(type_percentiles)
