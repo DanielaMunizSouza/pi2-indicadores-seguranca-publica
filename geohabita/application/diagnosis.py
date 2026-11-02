@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any, Protocol
 
 from geohabita.application.cep_lookup import Address
+from geohabita.domain.address import NUMBER_LOCATION_NOTICE, normalize_number
 from geohabita.domain.diagnosis import build_diagnosis
 from geohabita.domain.freshness import OUTDATED_MESSAGE, is_outdated
 from geohabita.domain.equipment import (
@@ -59,6 +60,8 @@ OCCURRENCE_NOTE = (
 )
 
 Geocoder = Callable[[Address], "tuple[float, float] | None"]
+# Nome do geocodificador que localiza o número do imóvel; os demais localizam o CEP.
+NUMBER_GEOCODER = "openstreetmap_numero"
 
 
 @dataclass(frozen=True)
@@ -111,18 +114,22 @@ class DiagnosisService:
         self.today = today
 
     # --- entradas ------------------------------------------------------------
-    def diagnose_cep(self, raw_cep: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    def diagnose_cep(self, raw_cep: str, weights: Mapping[str, Any] | None = None,
+                     number: str | None = None) -> dict[str, Any]:
+        """Diagnóstico do CEP; com o número do imóvel, tenta primeiro a posição do próprio número."""
         pesos = validated_weights(weights)
-        address = self.cep_lookup.lookup(raw_cep)
-        endereco = {"cep": address.cep, "logradouro": address.street, "bairro": address.neighbourhood,
-                    "municipio": address.city}
+        numero = normalize_number(number)
+        address = replace(self.cep_lookup.lookup(raw_cep), number=numero)
+        endereco = {"cep": address.cep, "logradouro": address.street, "numero": numero,
+                    "bairro": address.neighbourhood, "municipio": address.city}
         if not is_sao_paulo(address.ibge_code):
             return {"local": {"endereco": endereco}, "dentro_sao_paulo": False,
                     "aviso": OUT_OF_CITY_MESSAGE, "diagnostico": None}
         latitude, longitude, origem = self._locate(address)
         resultado = self._diagnose(latitude, longitude, origem, pesos)
         resultado["local"]["endereco"] = endereco
-        resultado["local"]["aviso_localizacao"] = APPROXIMATE_LOCATION_NOTICE
+        resultado["local"]["aviso_localizacao"] = (
+            NUMBER_LOCATION_NOTICE if origem == NUMBER_GEOCODER else APPROXIMATE_LOCATION_NOTICE)
         return resultado
 
     def diagnose_point(self, latitude: float, longitude: float,
@@ -130,9 +137,16 @@ class DiagnosisService:
         return self._diagnose(latitude, longitude, "informada", validated_weights(weights))
 
     def _locate(self, address: Address) -> tuple[float, float, str]:
+        # A posição do número informado vale mais que a coordenada do CEP, que
+        # em avenidas longas representa um trecho inteiro.
+        by_number = [g for g in self.geocoders if g[0] == NUMBER_GEOCODER]
+        by_cep = [g for g in self.geocoders if g[0] != NUMBER_GEOCODER]
+        for name, geocode in by_number if address.number else []:
+            if (point := geocode(address)) is not None:
+                return point[0], point[1], name
         if address.latitude is not None and address.longitude is not None:
             return address.latitude, address.longitude, "servico_cep"
-        for name, geocode in self.geocoders:
+        for name, geocode in by_cep:
             point = geocode(address)
             if point is not None:
                 return point[0], point[1], name

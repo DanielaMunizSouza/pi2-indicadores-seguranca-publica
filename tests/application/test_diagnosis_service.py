@@ -265,3 +265,32 @@ def test_sources_carry_reference_dates_and_outdated_flag():
     assert por_fonte["GeoSampa"]["aviso"] == OUTDATED_MESSAGE  # mais de 24 meses (RN11)
     assert por_fonte["IBGE"]["aviso"] is None  # censo decenal: a regra não se aplica
     assert por_fonte["SSP-SP"]["data_referencia"] == "2025-12-31"
+
+
+def test_house_number_position_comes_before_the_cep_coordinate():
+    from geohabita.application.diagnosis import NUMBER_GEOCODER
+    from geohabita.domain.address import NUMBER_LOCATION_NOTICE
+    vistos = []
+    endereco = Address("01001000", "Praça da Sé", "Sé", "São Paulo", "3550308", -23.55, -46.63)
+    r = service(address=endereco, geocoders=[
+        (NUMBER_GEOCODER, lambda a: vistos.append(a.number) or (-23.551, -46.631))]).diagnose_cep("01001000", number="120")
+    assert (r["local"]["latitude"], r["local"]["origem_coordenada"]) == (-23.551, NUMBER_GEOCODER)
+    assert r["local"]["aviso_localizacao"] == NUMBER_LOCATION_NOTICE and vistos == ["120"]
+    assert r["local"]["endereco"]["numero"] == "120"
+
+
+def test_number_not_found_falls_back_to_the_cep_coordinate():
+    from geohabita.application.diagnosis import NUMBER_GEOCODER
+    endereco = Address("01001000", "Praça da Sé", "Sé", "São Paulo", "3550308", -23.55, -46.63)
+    r = service(address=endereco, geocoders=[(NUMBER_GEOCODER, lambda a: None)]).diagnose_cep("01001000", number="9")
+    assert r["local"]["origem_coordenada"] == "servico_cep"
+    assert r["local"]["aviso_localizacao"] == APPROXIMATE_LOCATION_NOTICE
+
+
+def test_without_number_the_house_number_geocoder_is_not_used():
+    from geohabita.application.diagnosis import NUMBER_GEOCODER
+    usado = []
+    endereco = Address("01001000", "Praça da Sé", "Sé", "São Paulo", "3550308")
+    r = service(address=endereco, geocoders=[(NUMBER_GEOCODER, lambda a: usado.append(1) or (0.0, 0.0)),
+                                             ("outro", lambda a: (-23.55, -46.63))]).diagnose_cep("01001000")
+    assert r["local"]["origem_coordenada"] == "outro" and usado == []
