@@ -8,6 +8,8 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+import cargas
 from geohabita.config import DATABASE_URL as DB_URL
 
 ARQUIVO = ROOT / "data" / "reference" / "distritos_sp.geojson"
@@ -61,6 +63,8 @@ def main() -> None:
             if existe:
                 conn.execute("TRUNCATE public.ocorrencia_distrito")
                 print("Limites alterados: o distrito das ocorrências será recalculado no resumo.")
+        # RF19: a carga dos limites também fica registrada para auditoria.
+        cargas.registrar(conn, "geosampa", ARQUIVO.name, "distrito_municipal_sp", len(distritos))
         conn.commit()
     print(f"Limites oficiais importados: {len(distritos)} distritos.")
 

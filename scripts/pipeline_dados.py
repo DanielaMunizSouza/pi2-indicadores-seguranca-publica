@@ -24,6 +24,7 @@ Exemplo: uv run --env-file .env scripts/pipeline_dados.py --etapas geosampa-baix
 import argparse
 import csv
 import io
+import psycopg
 import json
 import os
 import re
@@ -41,6 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import baixar_ssp  # noqa: E402
 import carregar_ssp  # noqa: E402
+import cargas  # noqa: E402
 from progresso import Progresso  # noqa: E402
 
 WFS = "https://wfs.geosampa.prefeitura.sp.gov.br/geoserver/ows"
@@ -188,8 +190,8 @@ SQL_EQUIPAMENTO = (
     "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,importado_em=now()")
 
 
-def carregar_camada(camada, categoria, tipo, arquivo, progresso):
-    import psycopg
+def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
+    """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10)."""
     feicoes = json.loads(arquivo.read_text(encoding="utf-8"))["features"]
     linhas = []
     for i, f in enumerate(feicoes):
@@ -210,7 +212,9 @@ def carregar_camada(camada, categoria, tipo, arquivo, progresso):
             with conn.transaction(), conn.cursor() as cur:
                 cur.executemany(SQL_EQUIPAMENTO, linhas[i:i + LOTE])
             progresso.avanco(chave, feito=min(i + LOTE, len(linhas)))
+    conservados = len(linhas)  # linhas sem geometria já ficaram fora, acima
     progresso.fim(chave, f"{camada}: {len(linhas):,} equipamentos")
+    return conservados
 
 
 def etapa_geosampa_carregar(args, progresso):
@@ -218,8 +222,13 @@ def etapa_geosampa_carregar(args, progresso):
     presentes = [(c, *ct, pasta / f"{c}.geojson") for c, ct in CAMADAS.items() if (pasta / f"{c}.geojson").is_file()]
     presentes.sort(key=lambda x: -x[3].stat().st_size)  # maiores primeiro
     with ThreadPoolExecutor(args.workers) as pool:
-        for t in [pool.submit(carregar_camada, *x, progresso) for x in presentes]:
-            t.result()
+        tarefas = [(camada, pool.submit(carregar_camada, camada, categoria, tipo, arquivo, progresso))
+                   for camada, categoria, tipo, arquivo in presentes]
+    importados = {camada: tarefa.result() for camada, tarefa in tarefas}
+    # RF19: cada camada carregada deixa sua linha de auditoria em carga_etl.
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        for camada, _, tipo, _ in presentes:
+            cargas.registrar(conn, "geosampa", f"{camada}.geojson", tipo, importados.get(camada, 0))
 
 
 IBGE = "https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Agregados_por_Setores_Censitarios/Agregados_por_Distrito_csv/"
@@ -254,6 +263,8 @@ def etapa_ibge_populacao(args, progresso):
             raise SystemExit(f"Distritos sem par no IBGE (rode a etapa 'distritos' antes?): {faltam or 'tabela vazia'}")
         cur.executemany("UPDATE public.distrito_municipal_sp SET populacao_2022=%s WHERE codigo_distrito=%s",
                         [(ibge[sem_acento(nome)], codigo) for codigo, nome in distritos])
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        cargas.registrar(conn, "ibge", destino.name, "populacao_distrito", len(distritos))
     progresso.log(f"População 2022 gravada em {len(distritos)} distritos (total {sum(ibge.values()):,}).")
 
 

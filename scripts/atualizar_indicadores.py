@@ -22,6 +22,8 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+import cargas  # noqa: E402
 from geohabita.config import DATABASE_URL as DB_URL  # noqa: E402
 from geohabita.domain.equipment import EQUIPMENT_CATEGORY  # noqa: E402
 from geohabita.domain.rates import occurrence_group  # noqa: E402
@@ -116,6 +118,7 @@ def main() -> None:
                                     "(codigo_distrito, indicador, subcategoria, ano, valor) FROM STDIN") as copy:
                 for linha in linhas:
                     copy.write_row(linha)
+        cargas.registrar(conn, "derivado", "indicador_distrito", "indicadores", len(linhas))
     print(f"Indicadores por distrito atualizados: {len(linhas):,} valores.")
 
 
