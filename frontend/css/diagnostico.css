@@ -474,3 +474,14 @@ abbr {
 .detalhe-categoria .hint {
   margin: 6px 0 0;
 }
+
+/* Funcionamento (dia da feira, horário do mercado) no mapa e nas tabelas. */
+.popup-detalhes {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.detalhe-funcionamento {
+  font-weight: 400;
+  font-size: 0.8125rem;
+}

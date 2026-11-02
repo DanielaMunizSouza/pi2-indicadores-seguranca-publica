@@ -173,9 +173,9 @@ async function desenharMapa(d) {
       const marcador = L.circleMarker([item.latitude, item.longitude], {
         radius: 6, color: '#fff', weight: 1.5, fillColor: cor(categoria), fillOpacity: .95,
       });
-      marcador.bindPopup(el('div', {},
-        el('div', { class: 'popup-title', text: item.nome }),
-        el('div', { text: `${TIPOS[item.tipo]} · ${distancia(item.distancia_m)} em linha reta` })));
+      // A dica aparece ao passar o mouse; o clique abre a mesma informação fixa.
+      marcador.bindTooltip(conteudoDoPonto(item), { direction: 'top', offset: [0, -6] });
+      marcador.bindPopup(conteudoDoPonto(item));
       marcador.addTo(camadas.categorias[categoria]);
     }
   }
@@ -211,6 +211,25 @@ function linhaVazia(tbody, colunas, texto) {
   tbody.replaceChildren(el('tr', {}, el('td', { colSpan: colunas, text: texto })));
 }
 
+// ---------- funcionamento vindo da fonte (dia da feira, horário do mercado) ----------
+function textoDetalhes(detalhes) {
+  if (!detalhes) return '';
+  const partes = [];
+  if (detalhes.dia) partes.push(`Funciona: ${detalhes.dia}`);
+  if (detalhes.horario) partes.push(`Horário: ${detalhes.horario}`);
+  if (detalhes.telefone) partes.push(`Telefone: ${detalhes.telefone}`);
+  return partes.join(' · ');
+}
+
+/** Conteúdo do ponto no mapa (dica ao passar o mouse e janela ao clicar). */
+function conteudoDoPonto(item) {
+  const detalhes = textoDetalhes(item.detalhes);
+  return el('div', {},
+    el('div', { class: 'popup-title', text: item.nome }),
+    el('div', { text: `${TIPOS[item.tipo]} · ${distancia(item.distancia_m)} em linha reta` }),
+    detalhes ? el('div', { class: 'popup-detalhes', text: detalhes }) : null);
+}
+
 // ---------- o que conta em cada categoria (detalhes sob as barras) ----------
 const MAIS_PROXIMOS = 5;
 
@@ -239,7 +258,7 @@ function textoProximidade(info) {
   }
   if (info.distancia_m == null || info.aviso) return `${nota} · ${info.aviso}.`;
   return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta `
-    + `(${info.tempo_caminhada_min} min a pé).`;
+    + `(${info.tempo_caminhada_min} min a pé)${info.detalhes ? `. ${textoDetalhes(info.detalhes)}` : ''}.`;
 }
 
 function textoVitalidade(info) {
@@ -266,7 +285,8 @@ function renderProximidade(p) {
           ? `Os ${MAIS_PROXIMOS} mais próximos dos ${p.entorno[categoria].length} a até 1 km (todos na aba Ver como tabela):`
           : 'Todos a até 1 km:' }),
         el('ol', {}, ...proximos.map((e) => el('li', {
-          text: `${e.nome || TIPOS[e.tipo]} (${TIPOS[e.tipo]}), ${distancia(e.distancia_m)}`,
+          text: `${e.nome || TIPOS[e.tipo]} (${TIPOS[e.tipo]}), ${distancia(e.distancia_m)}`
+            + `${e.detalhes ? ` · ${textoDetalhes(e.detalhes)}` : ''}`,
         }))))
       : el('p', { class: 'hint', text: 'Nenhum equipamento desta categoria a até 1 km.' });
     item.append(detalhesDaCategoria(rotulo,
@@ -284,7 +304,8 @@ function renderProximidade(p) {
       : el('span', { class: 'muted', text: 'sem dados na fonte' });
     tabela.append(el('tr', {},
       el('th', { scope: 'row', text: TIPOS[tipo] }),
-      el('td', {}, nome, info.aviso && info.disponivel ? el('div', { class: 'muted', text: info.aviso }) : null),
+      el('td', {}, nome, info.aviso && info.disponivel ? el('div', { class: 'muted', text: info.aviso }) : null,
+        info.detalhes ? el('div', { class: 'muted detalhe-funcionamento', text: textoDetalhes(info.detalhes) }) : null),
       el('td', { class: 'num', text: info.pontos_no_raio != null ? '—' : distancia(info.distancia_m) }),
       el('td', { class: 'num', text: info.tempo_caminhada_min == null ? '—' : `${info.tempo_caminhada_min} min` }),
       el('td', { class: 'num', text: info.nota == null ? '—' : num.format(info.nota) }),
@@ -303,7 +324,8 @@ function renderProximidade(p) {
     tabelaEntorno.append(el('tr', {},
       el('td', { text: CATEGORIAS[categoria][0] }),
       el('td', { text: TIPOS[item.tipo] }),
-      el('th', { scope: 'row', text: item.nome }),
+      el('th', { scope: 'row' }, item.nome,
+        item.detalhes ? el('div', { class: 'muted detalhe-funcionamento', text: textoDetalhes(item.detalhes) }) : null),
       el('td', { class: 'num', text: distancia(item.distancia_m) }),
       el('td', { class: 'num', text: minutos(item.distancia_m) })));
   }

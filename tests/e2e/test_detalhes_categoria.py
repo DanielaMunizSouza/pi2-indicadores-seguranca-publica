@@ -96,3 +96,41 @@ def test_parque_de_acesso_restrito_e_identificado(api):
     detalhe.locator("summary").click()
     texto = detalhe.inner_text()
     assert "Campo Cerrado" in texto and "acesso restrito" in texto and "30%" in texto
+
+
+def _so_uma_feira(api, detalhes):
+    """Diagnóstico gravado com um único ponto no mapa: uma feira com os detalhes dados."""
+    resposta = json.loads((PASTA / "diagnostico.json").read_text(encoding="utf-8"))
+    feira = {"tipo": "feira_mercado_municipal", "nome": "FEIRA TESTE", "distancia_m": 120.0,
+             "latitude": resposta["local"]["latitude"] + 0.001, "longitude": resposta["local"]["longitude"],
+             "detalhes": detalhes}
+    resposta["diagnostico"]["proximidade"]["entorno"] = {"comercio_rua": [feira]}
+    resposta["diagnostico"]["proximidade"]["tipos"]["feira_mercado_municipal"] |= {
+        "nome": "FEIRA TESTE", "distancia_m": 120.0, "detalhes": detalhes}
+    api.route("**/api/diagnostico*", lambda route: route.fulfill(
+        status=200, content_type="application/json", body=json.dumps(resposta)))
+    api.goto(f"{api.base_url}/")
+    consulta(api)
+    return api
+
+
+def test_passar_o_mouse_na_feira_mostra_o_dia(api):
+    page = _so_uma_feira(api, {"dia": "domingo"})
+    page.locator("#map path.leaflet-interactive").first.dispatch_event("mouseover")
+    dica = page.locator(".leaflet-tooltip")
+    dica.wait_for()
+    assert "FEIRA TESTE" in dica.inner_text() and "Funciona: domingo" in dica.inner_text()
+
+
+def test_dia_da_feira_tambem_esta_nas_tabelas(api):
+    page = _so_uma_feira(api, {"dia": "domingo"})
+    assert "Funciona: domingo" in page.locator("#tipos tr", has_text="Feira livre").inner_text()
+    page.click("#aba-tabela")
+    assert "Funciona: domingo" in page.locator("#entorno tr", has_text="FEIRA TESTE").inner_text()
+
+
+def test_horario_e_telefone_do_mercado_na_dica(api):
+    page = _so_uma_feira(api, {"horario": "Segunda a sábado 8h-18h", "telefone": "11 3832-1834"})
+    page.locator("#map path.leaflet-interactive").first.dispatch_event("mouseover")
+    texto = page.locator(".leaflet-tooltip").inner_text()
+    assert "Horário: Segunda a sábado 8h-18h" in texto and "Telefone: 11 3832-1834" in texto
