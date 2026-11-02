@@ -42,10 +42,13 @@ services:
         condition: service_healthy
     environment:
       <<: *app-env
-      # O cabeçalho CF-Connecting-IP só é aceito de conexões vindas do cloudflared,
-      # que tem IP fixo na rede abaixo (RNF15). Fixo aqui, e não lido de .env, porque
-      # o valor de .env vale para a execução fora do Docker.
-      GEOHABITA_PROXIES_CONFIAVEIS: 172.28.0.10
+      # O cabeçalho CF-Connecting-IP só é aceito de conexões vindas do cloudflared
+      # (RNF08). Duas origens possíveis, fixas aqui e não lidas de .env (o valor de
+      # .env vale para a execução fora do Docker):
+      #  - 172.28.0.1: gateway da rede. É de onde chega quem usa a porta publicada
+      #    em 127.0.0.1, como um cloudflared instalado no próprio servidor;
+      #  - 172.28.0.10: o contêiner cloudflared do perfil "tunel".
+      GEOHABITA_PROXIES_CONFIAVEIS: 172.28.0.1,172.28.0.10
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     networks:
@@ -86,6 +89,7 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1  # fixo: a aplicação confia no CF-Connecting-IP vindo dele
 
 volumes:
   postgis_data:
