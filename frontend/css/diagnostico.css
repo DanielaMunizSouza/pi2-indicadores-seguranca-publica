@@ -8,14 +8,14 @@
   align-items: end;
 }
 
-.search label {
+.search label, .comp-busca label {
   display: block;
   font-weight: 800;
   font-size: 15px;
   margin-bottom: 5px;
 }
 
-.search input {
+.search input, .comp-busca input {
   width: 100%;
   height: 46px;
   border: 1px solid #8ebdb7;
@@ -89,6 +89,101 @@
 .place .district {
   font-weight: 800;
   color: var(--teal-dark);
+}
+
+/* Comparação (RF16): a mesma busca da consulta principal e uma tabela por colunas. */
+.comp-busca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  max-width: 760px;
+  margin-top: 6px;
+}
+
+#comparar {
+  margin-top: 16px;
+}
+
+/* Sem altura máxima: a comparação inteira cabe na página; só rola na horizontal. */
+#comparar .table-wrap {
+  max-height: none;
+}
+
+.comp-tabela {
+  min-width: 560px;
+}
+
+.comp-tabela thead th {
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: bottom;
+  border-bottom: 2px solid var(--line);
+  padding: 10px 8px;
+}
+
+.comp-tabela thead th.comp-indicador {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  width: 32%;
+}
+
+.comp-col {
+  min-width: 180px;
+}
+
+.comp-col > span {
+  display: block;
+}
+
+.comp-titulo {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.comp-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 2px 0 6px;
+}
+
+.comp-col .tag {
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.comp-col .comp-remover {
+  display: block;
+}
+
+.comp-tabela tbody td {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Valor logo abaixo do nome do endereço, na mesma coluna e alinhamento. */
+.comp-tabela td.num {
+  text-align: left;
+}
+
+.comp-tabela tr.comp-grupo th {
+  background: #f2f6f7;
+  color: #405963;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding-top: 10px;
+}
+
+.comp-notas {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 .acoes-consulta {
@@ -318,6 +413,10 @@ abbr {
 }
 
 @media (max-width: 560px) {
+  .comp-busca {
+    grid-template-columns: 1fr;
+  }
+
   main {
     padding: 0 10px;
   }

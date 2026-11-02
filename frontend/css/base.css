@@ -196,6 +196,12 @@ main {
   background: #d7e6ea;
 }
 
+.btn-pequeno {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
 .notice {
   font-size: 14px;
   color: var(--muted);

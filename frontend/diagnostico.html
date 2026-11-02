@@ -123,11 +123,11 @@
    <h3 id="comp-titulo">Comparar até três endereços</h3>
    <p class="hint">A consulta atual pode ser fixada aqui; depois informe outro CEP ou endereço. Os índices usam as prioridades escolhidas em "Minhas prioridades". Nenhum endereço é salvo no servidor.</p>
    <form class="comp-busca" id="form-comparar">
-    <div class="campo"><label for="comp-entrada">CEP ou rua com número</label>
-     <input id="comp-entrada" inputmode="text" placeholder="01001-000 · Rua Harmonia 300" aria-describedby="comp-ajuda"></div>
-    <button class="btn" type="submit">Adicionar</button>
+    <div class="campo"><label for="comp-entrada">CEP ou rua, com o número se souber</label>
+     <input id="comp-entrada" autocomplete="off" placeholder="01001-000 120  ·  Rua Harmonia, 300" aria-describedby="comp-ajuda"></div>
+    <button class="btn" type="submit">Adicionar à comparação</button>
    </form>
-   <p id="comp-ajuda" class="hint">Com um CEP, informe o número separadamente em "Número do imóvel" na consulta principal; com o nome da rua, escreva o número junto.</p>
+   <p id="comp-ajuda" class="hint">Exemplos: "01310-200 1578", "Avenida Paulista, 1578" ou só "01001-000". Até três endereços.</p>
    <div class="comp-lista" id="comparar"></div>
   </section>
  </div>

@@ -97,7 +97,7 @@ async function recalcularComparacao() {
   const alvos = comparacoes.map((item) => item.alvo);
   try {
     const respostas = await Promise.all(alvos.map((alvo) => consultar(alvo)));
-    comparacoes = respostas.map((r, i) => ({ ...resumoDe(r), alvo: alvos[i] }));
+    comparacoes = respostas.map((r, i) => resumoDe(r, alvos[i]));
     renderComparacao();
   } catch {
     /* mantém a comparação anterior se alguma consulta falhar */
@@ -418,20 +418,29 @@ baixar.addEventListener('click', () => {
 const MAXIMO_COMPARACAO = 3;
 let comparacoes = [];
 
+/** Separa "CEP [número]" ou "rua[,] número"; o número é sempre opcional. */
+function interpretarEntrada(texto) {
+  const limpo = (texto || '').trim();
+  const cep = limpo.match(/^(\d{5})-?(\d{3})(?:[\s,]+(?:n[º°o.]?\s*)?(\d{1,6}))?$/i);
+  if (cep) return { cep: cep[1] + cep[2], numero: cep[3] || '' };
+  const rua = limpo.match(/^(.*?\S)[\s,]+(?:n[º°o.]?\s*)?(\d{1,6})$/i);
+  if (rua) return { logradouro: rua[1].replace(/,$/, ''), numero: rua[2] };
+  return { logradouro: limpo, numero: '' };
+}
+
 async function resolverEndereco(texto) {
-  /** "01001-000" vira CEP; qualquer outra coisa passa pela busca de endereço. */
-  const digitos = (texto || '').replace(/\D/g, '');
-  if (/^[0-9-]+$/.test(texto.trim()) && digitos.length === 8) {
-    return { cep: digitos, numero: state.endereco?.numero || '' };
-  }
-  const resposta = await getJSON(`/api/enderecos?${new URLSearchParams({ logradouro: texto })}`);
+  const entrada = interpretarEntrada(texto);
+  if (entrada.cep) return { cep: entrada.cep, numero: entrada.numero };
+  const query = new URLSearchParams({ logradouro: entrada.logradouro });
+  if (entrada.numero) query.set('numero', entrada.numero);
+  const resposta = await getJSON(`/api/enderecos?${query}`);
   if (!resposta.candidatos.length) throw new Error(resposta.mensagem || 'Endereço não encontrado.');
-  if (resposta.sugerido != null) {
-    const escolha = resposta.candidatos[resposta.sugerido];
-    return escolha.cep ? { cep: escolha.cep, numero: escolha.numero }
-      : { lat: escolha.latitude, lon: escolha.longitude, rotulo: escolha.rotulo || escolha.logradouro };
+  if (resposta.sugerido == null) {
+    throw new Error('Mais de um endereço corresponde: informe o número do imóvel ou use o CEP.');
   }
-  throw new Error('Mais de um endereço corresponde: refine com o número do imóvel.');
+  const escolha = resposta.candidatos[resposta.sugerido];
+  return escolha.cep ? { cep: escolha.cep, numero: entrada.numero || escolha.numero }
+    : { lat: escolha.latitude, lon: escolha.longitude, rotulo: escolha.rotulo || escolha.logradouro };
 }
 
 async function consultar(alvo) {
@@ -446,67 +455,100 @@ async function consultar(alvo) {
   return getJSON(`/api/diagnostico?${query}`);
 }
 
-function resumoDe(resposta, alvo = state.alvo) {
+/** Resumo de um diagnóstico para a comparação; `alvo` é o que se consulta de novo ao mudar os pesos. */
+function resumoDe(resposta, alvo) {
   const d = resposta.diagnostico;
-  const naturezas = Object.values(d.ocorrencias.naturezas);
-  const comTaxa = naturezas.filter((n) => n.taxa_100k_ano != null);
+  const endereco = resposta.local.endereco;
   return {
-    titulo: resposta.local.endereco
-      ? [resposta.local.endereco.logradouro, resposta.local.endereco.numero && `nº ${resposta.local.endereco.numero}`,
-         resposta.local.endereco.bairro].filter(Boolean).join(', ') || `CEP ${resposta.local.endereco.cep}`
-      : (resposta.local.rotulo || 'Ponto no mapa'),
+    titulo: endereco
+      ? [endereco.logradouro, endereco.numero && `nº ${endereco.numero}`].filter(Boolean).join(', ')
+        || `CEP ${endereco.cep}`
+      : (alvo.rotulo || 'Ponto no mapa'),
+    subtitulo: [endereco?.bairro, endereco?.cep && `CEP ${endereco.cep.replace(/^(\d{5})/, '$1-')}`]
+      .filter(Boolean).join(' · '),
     distrito: resposta.local.distrito,
     ipl: d.proximidade.ipl,
     ivep: d.vitalidade.ivep,
+    mediana: d.vitalidade.mediana_municipal,
     categorias: d.proximidade.categorias,
     iluminacao: d.proximidade.tipos.iluminacao_publica,
-    ocorrencias: comTaxa.map((n) => ({ rotulo: n.rotulo, taxa: n.taxa_100k_ano })),
-    semTaxa: naturezas.filter((n) => n.taxa_100k_ano == null).map((n) => n.rotulo),
+    naturezas: d.ocorrencias.naturezas,
+    janela: d.ocorrencias.janela,
     aviso: resposta.local.aviso_localizacao,
     alvo,
   };
 }
 
-function cartaoComparacao(item, indice) {
-  const remover = el('button', { type: 'button', class: 'btn-light comp-remover', text: 'Remover' });
-  remover.addEventListener('click', () => {
-    comparacoes.splice(indice, 1);
-    renderComparacao();
-  });
-  const categorias = el('ul', { class: 'bars' });
-  for (const [categoria, info] of Object.entries(item.categorias)) {
-    if (info.nota == null) continue;
-    categorias.append(el('li', { class: 'comp-item' },
-      el('span', { text: CATEGORIAS[categoria][0] }),
-      el('span', { class: 'value', text: num.format(info.nota) })));
+const formatar = (valor, sufixo = '') => (valor == null ? '—' : `${num.format(valor)}${sufixo}`);
+
+// Linhas da tabela: [grupo, rótulo, função que extrai o texto do resumo].
+function linhasComparacao() {
+  const linhas = [
+    ['Índices de 0 a 100', 'Proximidade (IPL)', (c) => formatar(c.ipl)],
+    ['Índices de 0 a 100', 'Vitalidade do distrito (IVEP)', (c) => formatar(c.ivep)],
+  ];
+  for (const [categoria, [rotulo]] of Object.entries(CATEGORIAS)) {
+    linhas.push(['Proximidade por categoria (0 a 100)', rotulo, (c) => formatar(c.categorias[categoria]?.nota)]);
   }
-  const ocorrencias = el('ul', { class: 'bars' });
-  for (const n of item.ocorrencias) {
-    ocorrencias.append(el('li', { class: 'comp-item' },
-      el('span', { text: n.rotulo }), el('span', { class: 'value', text: `${num.format(n.taxa)} / 100 mil` })));
+  linhas.push(['Proximidade por categoria (0 a 100)', 'Iluminação pública', (c) => (c.iluminacao?.nota == null
+    ? '—' : `${num.format(c.iluminacao.nota)} (${int.format(c.iluminacao.densidade_km2)} pontos/km²)`)]);
+  const naturezas = comparacoes[0]?.naturezas || {};
+  for (const [grupo, info] of Object.entries(naturezas)) {
+    linhas.push(['Ocorrências por 100 mil moradores por ano', info.rotulo, (c) => {
+      const n = c.naturezas[grupo];
+      return n?.taxa_100k_ano == null ? 'poucos registros' : num.format(n.taxa_100k_ano);
+    }]);
   }
-  if (item.semTaxa.length) {
-    ocorrencias.append(el('li', { class: 'comp-nota', text: `Sem taxa comparável: ${item.semTaxa.join(', ')}.` }));
-  }
-  return el('article', { class: 'card comp-card' },
-    el('h4', {}, el('span', { text: item.titulo }), el('span', { class: 'tag', text: `distrito ${item.distrito.nome}` })),
-    remover,
-    el('p', { class: 'comp-indices' },
-      el('strong', { text: `IPL ${item.ipl == null ? '—' : num.format(item.ipl)}` }),
-      el('span', { text: ` · IVEP ${num.format(item.ivep)} · iluminação ${item.iluminacao.nota == null ? 'sem dados' : `${num.format(item.iluminacao.nota)} (${int.format(item.iluminacao.densidade_km2 ?? 0)} pontos/km²)`}` }),
-      ' de 100'),
-    categorias, ocorrencias,
-    item.aviso ? el('p', { class: 'hint', text: item.aviso }) : null);
+  return linhas;
 }
 
 function renderComparacao() {
   const lista = $('comparar');
   lista.replaceChildren();
   if (!comparacoes.length) {
-    lista.append(el('p', { class: 'empty', text: 'Nenhum endereço fixado. Use "Fixar esta consulta" ou adicione acima.' }));
+    lista.append(el('p', { class: 'empty', text: 'Nenhum endereço na comparação. Use "Fixar esta consulta para comparar" ou adicione um endereço acima.' }));
     return;
   }
-  for (const [indice, item] of comparacoes.entries()) lista.append(cartaoComparacao(item, indice));
+  const cabecalho = el('tr', {}, el('th', { scope: 'col', class: 'comp-indicador', text: 'Indicador' }));
+  for (const [indice, item] of comparacoes.entries()) {
+    const remover = el('button', {
+      type: 'button', class: 'btn btn-light btn-pequeno comp-remover', text: 'Remover',
+      'aria-label': `Remover ${item.titulo} da comparação`,
+    });
+    remover.addEventListener('click', () => {
+      comparacoes.splice(indice, 1);
+      renderComparacao();
+      anunciar(`${item.titulo} removido da comparação.`);
+    });
+    cabecalho.append(el('th', { scope: 'col', class: 'comp-col' },
+      el('span', { class: 'comp-titulo', text: item.titulo }),
+      item.subtitulo ? el('span', { class: 'comp-sub', text: item.subtitulo }) : null,
+      el('span', { class: 'tag', text: `Distrito ${item.distrito.nome}` }),
+      remover));
+  }
+  const corpo = el('tbody');
+  let grupoAtual = null;
+  for (const [grupo, rotulo, valor] of linhasComparacao()) {
+    if (grupo !== grupoAtual) {
+      grupoAtual = grupo;
+      corpo.append(el('tr', { class: 'comp-grupo' },
+        el('th', { scope: 'colgroup', colSpan: comparacoes.length + 1, text: grupo })));
+    }
+    corpo.append(el('tr', {}, el('th', { scope: 'row', text: rotulo }),
+      ...comparacoes.map((item) => el('td', { class: 'num', text: valor(item) }))));
+  }
+  const tabela = el('table', { class: 'comp-tabela' },
+    el('caption', { class: 'sr-only', text: `Comparação de ${comparacoes.length} endereços: índices, proximidade por categoria e taxas oficiais de ocorrências do distrito.` }),
+    el('thead', {}, cabecalho), corpo);
+  const notas = el('ul', { class: 'comp-notas' });
+  for (const item of comparacoes) {
+    if (item.aviso) notas.append(el('li', {}, el('strong', { text: `${item.titulo}: ` }), item.aviso));
+  }
+  lista.append(
+    el('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Tabela de comparação, em rolagem' }, tabela),
+    el('p', { class: 'hint', text: `As taxas são do distrito de cada endereço, nos anos ${comparacoes[0].janela.join(' a ')}; `
+      + '"poucos registros" indica menos de 30 no período, sem taxa comparável.' }),
+    notas.children.length ? notas : null);
 }
 
 function fixarConsultaAtual() {
@@ -514,7 +556,7 @@ function fixarConsultaAtual() {
     anunciar('Consulte um endereço antes de fixá-lo na comparação.', true);
     return;
   }
-  const resumo = resumoDe(state.dados);
+  const resumo = resumoDe(state.dados, state.alvo);
   const repetido = comparacoes.findIndex((c) => c.titulo === resumo.titulo);
   if (repetido >= 0) comparacoes.splice(repetido, 1);
   if (comparacoes.length >= MAXIMO_COMPARACAO) comparacoes.shift();
@@ -539,7 +581,7 @@ $('form-comparar').addEventListener('submit', async (evento) => {
     const alvo = await resolverEndereco(entrada);
     const resposta = await consultar(alvo);
     if (!resposta.diagnostico) throw new Error(resposta.aviso || 'Endereço fora do município.');
-    comparacoes.push(resumoDe(resposta));
+    comparacoes.push(resumoDe(resposta, alvo));
     $('comp-entrada').value = '';
     renderComparacao();
     anunciar(`${resposta.local.distrito.nome} adicionado à comparação (${comparacoes.length} de ${MAXIMO_COMPARACAO}).`);
@@ -570,7 +612,7 @@ async function diagnosticar(alvo, soPesos = false) {
   try {
     const resposta = await getJSON(`/api/diagnostico?${query}`);
     if (pedido !== state.pedido) return;
-    state.alvo = alvo;
+    if (!soPesos) state.alvo = alvo;  // o recálculo usa as coordenadas; o alvo segue sendo o CEP
     if (alvo.cep) state.endereco = resposta.local.endereco || null;
     state.origem = resposta.local.origem_coordenada;
     if (!resposta.diagnostico && !alvo.cep && state.dados) {
