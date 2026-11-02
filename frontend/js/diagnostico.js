@@ -86,7 +86,22 @@ let espera = null;
 function recalcular() {
   clearTimeout(espera);
   if (state.lat == null) return;
-  espera = setTimeout(() => diagnosticar({ lat: state.lat, lon: state.lon }, true), 250);
+  espera = setTimeout(async () => {
+    await diagnosticar({ lat: state.lat, lon: state.lon }, true);
+    await recalcularComparacao();
+  }, 250);
+}
+
+async function recalcularComparacao() {
+  if (!comparacoes.length) return;
+  const alvos = comparacoes.map((item) => item.alvo);
+  try {
+    const respostas = await Promise.all(alvos.map((alvo) => consultar(alvo)));
+    comparacoes = respostas.map((r, i) => ({ ...resumoDe(r), alvo: alvos[i] }));
+    renderComparacao();
+  } catch {
+    /* mantém a comparação anterior se alguma consulta falhar */
+  }
 }
 
 // ---------- abas (padrão WAI-ARIA) ----------
@@ -329,6 +344,144 @@ async function render(resposta, soPesos) {
   if (!soPesos) await desenharMapa(d);
 }
 
+// ---------- comparação de até três endereços (RF16, UC05) ----------
+const MAXIMO_COMPARACAO = 3;
+let comparacoes = [];
+
+async function resolverEndereco(texto) {
+  /** "01001-000" vira CEP; qualquer outra coisa passa pela busca de endereço. */
+  const digitos = (texto || '').replace(/\D/g, '');
+  if (/^[0-9-]+$/.test(texto.trim()) && digitos.length === 8) {
+    return { cep: digitos, numero: state.endereco?.numero || '' };
+  }
+  const resposta = await getJSON(`/api/enderecos?${new URLSearchParams({ logradouro: texto })}`);
+  if (!resposta.candidatos.length) throw new Error(resposta.mensagem || 'Endereço não encontrado.');
+  if (resposta.sugerido != null) {
+    const escolha = resposta.candidatos[resposta.sugerido];
+    return escolha.cep ? { cep: escolha.cep, numero: escolha.numero }
+      : { lat: escolha.latitude, lon: escolha.longitude, rotulo: escolha.rotulo || escolha.logradouro };
+  }
+  throw new Error('Mais de um endereço corresponde: refine com o número do imóvel.');
+}
+
+async function consultar(alvo) {
+  const query = new URLSearchParams(pesos());
+  if (alvo.cep) {
+    query.set('cep', alvo.cep);
+    if (alvo.numero) query.set('numero', alvo.numero);
+  } else {
+    query.set('lat', alvo.lat.toFixed(6));
+    query.set('lon', alvo.lon.toFixed(6));
+  }
+  return getJSON(`/api/diagnostico?${query}`);
+}
+
+function resumoDe(resposta, alvo = state.alvo) {
+  const d = resposta.diagnostico;
+  const naturezas = Object.values(d.ocorrencias.naturezas);
+  const comTaxa = naturezas.filter((n) => n.taxa_100k_ano != null);
+  return {
+    titulo: resposta.local.endereco
+      ? [resposta.local.endereco.logradouro, resposta.local.endereco.numero && `nº ${resposta.local.endereco.numero}`,
+         resposta.local.endereco.bairro].filter(Boolean).join(', ') || `CEP ${resposta.local.endereco.cep}`
+      : (resposta.local.rotulo || 'Ponto no mapa'),
+    distrito: resposta.local.distrito,
+    ipl: d.proximidade.ipl,
+    ivep: d.vitalidade.ivep,
+    categorias: d.proximidade.categorias,
+    iluminacao: d.proximidade.tipos.iluminacao_publica,
+    ocorrencias: comTaxa.map((n) => ({ rotulo: n.rotulo, taxa: n.taxa_100k_ano })),
+    semTaxa: naturezas.filter((n) => n.taxa_100k_ano == null).map((n) => n.rotulo),
+    aviso: resposta.local.aviso_localizacao,
+    alvo,
+  };
+}
+
+function cartaoComparacao(item, indice) {
+  const remover = el('button', { type: 'button', class: 'btn-light comp-remover', text: 'Remover' });
+  remover.addEventListener('click', () => {
+    comparacoes.splice(indice, 1);
+    renderComparacao();
+  });
+  const categorias = el('ul', { class: 'bars' });
+  for (const [categoria, info] of Object.entries(item.categorias)) {
+    if (info.nota == null) continue;
+    categorias.append(el('li', { class: 'comp-item' },
+      el('span', { text: CATEGORIAS[categoria][0] }),
+      el('span', { class: 'value', text: num.format(info.nota) })));
+  }
+  const ocorrencias = el('ul', { class: 'bars' });
+  for (const n of item.ocorrencias) {
+    ocorrencias.append(el('li', { class: 'comp-item' },
+      el('span', { text: n.rotulo }), el('span', { class: 'value', text: `${num.format(n.taxa)} / 100 mil` })));
+  }
+  if (item.semTaxa.length) {
+    ocorrencias.append(el('li', { class: 'comp-nota', text: `Sem taxa comparável: ${item.semTaxa.join(', ')}.` }));
+  }
+  return el('article', { class: 'card comp-card' },
+    el('h4', {}, el('span', { text: item.titulo }), el('span', { class: 'tag', text: `distrito ${item.distrito.nome}` })),
+    remover,
+    el('p', { class: 'comp-indices' },
+      el('strong', { text: `IPL ${item.ipl == null ? '—' : num.format(item.ipl)}` }),
+      el('span', { text: ` · IVEP ${num.format(item.ivep)} · iluminação ${item.iluminacao.nota == null ? 'sem dados' : `${num.format(item.iluminacao.nota)} (${int.format(item.iluminacao.densidade_km2 ?? 0)} pontos/km²)`}` }),
+      ' de 100'),
+    categorias, ocorrencias,
+    item.aviso ? el('p', { class: 'hint', text: item.aviso }) : null);
+}
+
+function renderComparacao() {
+  const lista = $('comparar');
+  lista.replaceChildren();
+  if (!comparacoes.length) {
+    lista.append(el('p', { class: 'empty', text: 'Nenhum endereço fixado. Use "Fixar esta consulta" ou adicione acima.' }));
+    return;
+  }
+  for (const [indice, item] of comparacoes.entries()) lista.append(cartaoComparacao(item, indice));
+}
+
+function fixarConsultaAtual() {
+  if (!state.dados?.diagnostico) {
+    anunciar('Consulte um endereço antes de fixá-lo na comparação.', true);
+    return;
+  }
+  const resumo = resumoDe(state.dados);
+  const repetido = comparacoes.findIndex((c) => c.titulo === resumo.titulo);
+  if (repetido >= 0) comparacoes.splice(repetido, 1);
+  if (comparacoes.length >= MAXIMO_COMPARACAO) comparacoes.shift();
+  comparacoes.push(resumo);
+  renderComparacao();
+  anunciar(`${resumo.titulo} fixado na comparação (${comparacoes.length} de ${MAXIMO_COMPARACAO}).`);
+}
+
+$('form-comparar').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const entrada = $('comp-entrada').value.trim();
+  if (!entrada) {
+    anunciar('Informe um CEP ou uma rua com número para comparar.', true);
+    return;
+  }
+  if (comparacoes.length >= MAXIMO_COMPARACAO) {
+    anunciar('A comparação aceita três endereços: remova um antes de adicionar outro.', true);
+    return;
+  }
+  anunciar('Consultando o endereço para comparação…');
+  try {
+    const alvo = await resolverEndereco(entrada);
+    const resposta = await consultar(alvo);
+    if (!resposta.diagnostico) throw new Error(resposta.aviso || 'Endereço fora do município.');
+    comparacoes.push(resumoDe(resposta));
+    $('comp-entrada').value = '';
+    renderComparacao();
+    anunciar(`${resposta.local.distrito.nome} adicionado à comparação (${comparacoes.length} de ${MAXIMO_COMPARACAO}).`);
+  } catch (erro) {
+    anunciar(erro.message, true);
+  }
+});
+
+const fixar = el('button', { type: 'button', class: 'btn-light', text: 'Fixar esta consulta para comparar' });
+fixar.addEventListener('click', fixarConsultaAtual);
+$('consulta').append(fixar);
+
 // ---------- consulta (RF15: resultado e erros na região viva) ----------
 async function diagnosticar(alvo, soPesos = false) {
   const pedido = ++state.pedido;
@@ -345,6 +498,7 @@ async function diagnosticar(alvo, soPesos = false) {
   try {
     const resposta = await getJSON(`/api/diagnostico?${query}`);
     if (pedido !== state.pedido) return;
+    state.alvo = alvo;
     if (alvo.cep) state.endereco = resposta.local.endereco || null;
     state.origem = resposta.local.origem_coordenada;
     if (!resposta.diagnostico && !alvo.cep && state.dados) {

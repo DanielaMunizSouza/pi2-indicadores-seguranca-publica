@@ -55,6 +55,7 @@
   <button role="tab" id="aba-proximidade" aria-controls="painel-proximidade" aria-selected="true">Proximidade</button>
   <button role="tab" id="aba-vitalidade" aria-controls="painel-vitalidade" aria-selected="false" tabindex="-1">Vitalidade do distrito</button>
   <button role="tab" id="aba-ocorrencias" aria-controls="painel-ocorrencias" aria-selected="false" tabindex="-1">Ocorrências oficiais</button>
+  <button role="tab" id="aba-comparar" aria-controls="painel-comparar" aria-selected="false" tabindex="-1">Comparar</button>
   <button role="tab" id="aba-tabela" aria-controls="painel-tabela" aria-selected="false" tabindex="-1">Ver como tabela</button>
  </div>
 
@@ -114,6 +115,20 @@
    <p class="warning" id="occ-subnotificacao" style="margin-top:0"></p>
    <div class="occ-grid" id="ocorrencias"></div>
    <p class="hint" id="occ-observacao"></p>
+  </section>
+ </div>
+
+ <div role="tabpanel" id="painel-comparar" aria-labelledby="aba-comparar" tabindex="0" hidden>
+  <section class="card" aria-labelledby="comp-titulo">
+   <h3 id="comp-titulo">Comparar até três endereços</h3>
+   <p class="hint">A consulta atual pode ser fixada aqui; depois informe outro CEP ou endereço. Os índices usam as prioridades escolhidas em "Minhas prioridades". Nenhum endereço é salvo no servidor.</p>
+   <form class="comp-busca" id="form-comparar">
+    <div class="campo"><label for="comp-entrada">CEP ou rua com número</label>
+     <input id="comp-entrada" inputmode="text" placeholder="01001-000 · Rua Harmonia 300" aria-describedby="comp-ajuda"></div>
+    <button class="btn" type="submit">Adicionar</button>
+   </form>
+   <p id="comp-ajuda" class="hint">Com um CEP, informe o número separadamente em "Número do imóvel" na consulta principal; com o nome da rua, escreva o número junto.</p>
+   <div class="comp-lista" id="comparar"></div>
   </section>
  </div>
 

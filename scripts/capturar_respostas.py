@@ -39,6 +39,8 @@ def main():
     if args.numero:
         consulta["numero"] = args.numero
     endereco = {"cep": args.cep.replace("-", ""), "logradouro": args.logradouro}
+    alternativos = {cep: args.base + "/api/diagnostico?cep=" + cep for cep in
+                    [c.replace("-", "") for c in (args.cep, "01001-000", "05508-040")]}
     arquivos = {
         "status.json": "/api/status",
         "categories.json": "/api/categories",
@@ -64,6 +66,14 @@ def main():
         conteudo = buscar(url)
         (DESTINO / nome).write_bytes(conteudo)
         print(f"{nome}: {len(conteudo):,} bytes")
+
+    nomes = {"01001000": "diagnostico-se", "05508040": "diagnostico-pinheiros"}
+    for cep, url in alternativos.items():
+        if cep == args.cep.replace("-", ""):
+            continue
+        arquivo = DESTINO / f"{nomes.get(cep, 'diagnostico-' + cep)}.json"
+        arquivo.write_bytes(buscar(url))
+        print(f"{arquivo.name}: {arquivo.stat().st_size:,} bytes")
 
     diagnostico = json.loads((DESTINO / "diagnostico.json").read_text(encoding="utf-8"))
     codigo = diagnostico.get("local", {}).get("distrito", {}).get("codigo")

@@ -40,6 +40,9 @@ ROTAS = {
     "/api/distritos/": ("limite", "application/geo+json"),
 }
 
+# Diagnósticos alternativos, escolhidos pelo parâmetro `cep` da consulta.
+DIAGNOSTICOS = {"01001000": "diagnostico-se", "05508040": "diagnostico-pinheiros"}
+
 
 def porta_livre() -> int:
     with socket.socket() as so:
@@ -75,6 +78,16 @@ def base_url():
         processo.kill()
 
 
+_CONTEUDO: dict[Path, bytes] = {}
+
+
+def lido(nome: Path) -> bytes:
+    """Lê o arquivo uma vez: a geometria dos distritos tem megabytes."""
+    if nome not in _CONTEUDO:
+        _CONTEUDO[nome] = nome.read_bytes()
+    return _CONTEUDO[nome]
+
+
 def simular(base_url: str, alvo) -> None:
     """Responde `/api/*` com os arquivos locais; o resto é bloqueado."""
     def despachar(route):
@@ -84,7 +97,14 @@ def simular(base_url: str, alvo) -> None:
             route.abort()
             return
         nome, tipo = entrada
-        route.fulfill(status=200, content_type=tipo, body=(PASTA / f"{nome}.json").read_bytes())
+        if caminho == "/api/diagnostico":
+            consulta = dict(pair.split("=", 1) for pair in route.request.url.split("?", 1)[-1].split("&")
+                            if "=" in pair)
+            nome = DIAGNOSTICOS.get(consulta.get("cep", "").replace("-", ""), nome)
+        arquivo = PASTA / f"{nome}.json"
+        if not arquivo.is_file():
+            arquivo = PASTA / "diagnostico.json"
+        route.fulfill(status=200, content_type=tipo, body=lido(arquivo))
 
     alvo.route("**/api/**", despachar)
 
