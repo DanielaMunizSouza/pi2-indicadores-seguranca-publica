@@ -67,7 +67,7 @@ PERCENTIS = {"T1": 80.0, "T2": 20.0, "T3": 50.0}
 OCORRENCIAS = (
     [("T1", (10 * i, 0), date(2024, 1 + i % 12, 5), "criminal", "FURTO (ART. 155)", "01310100") for i in range(12)]
     + [("T1", (0, 10 * i), date(2025, 3, 10), "criminal", "ROUBO (ART. 157)", "01310100") for i in range(3)]
-    + [("T2", (M * 2, 10 * i), date(2024, 6, 1), "celulares_subtraidos", None, "01310100") for i in range(5)]
+    + [("T2", (M * 2, M * 0.5), date(2024, 6, 1), "celulares_subtraidos", None, "01310100") for i in range(5)]
     + [("T3", (0, M * 2), date(2025, 7, 1), "criminal", "FURTO (ART. 155)", "02000000")]
 )
 
