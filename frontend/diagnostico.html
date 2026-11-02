@@ -47,9 +47,9 @@
 
 <section id="fora" class="card warning" hidden aria-labelledby="fora-titulo"><h2 id="fora-titulo">Endereço fora do município</h2><p id="fora-texto"></p></section>
 
-<section id="resultado" hidden aria-labelledby="local-titulo">
- <div class="place"><h2 id="local-titulo" tabindex="-1"></h2><span class="district" id="local-distrito"></span></div>
- <p class="notice" id="local-aviso"></p>
+<section id="resultado" aria-labelledby="local-titulo">
+ <div class="place"><h2 id="local-titulo" tabindex="-1">Nenhum endereço consultado</h2><span class="district" id="local-distrito"></span></div>
+ <p class="notice" id="local-aviso">Os índices aparecem depois da primeira consulta; as abas já podem ser percorridas pelo teclado.</p>
 
  <div role="tablist" aria-label="Partes do diagnóstico" id="abas">
   <button role="tab" id="aba-proximidade" aria-controls="painel-proximidade" aria-selected="true">Proximidade</button>
@@ -82,7 +82,7 @@
   </div>
   <section class="card" style="margin-top:14px" aria-labelledby="tipos-titulo">
    <h3 id="tipos-titulo">Equipamento mais próximo de cada tipo</h3>
-   <div class="table-wrap"><table><caption class="sr-only">Equipamento mais próximo de cada tipo: distância em linha reta, tempo a pé, nota e quantidade a até 500 metros e 1 quilômetro. Para a iluminação pública, a coluna de nome traz a quantidade de pontos no entorno de 300 metros e a densidade por quilômetro quadrado.</caption>
+   <div class="table-wrap" tabindex="0" role="region" aria-label="Tabela em rolagem horizontal e vertical"><table><caption class="sr-only">Equipamento mais próximo de cada tipo: distância em linha reta, tempo a pé, nota e quantidade a até 500 metros e 1 quilômetro. Para a iluminação pública, a coluna de nome traz a quantidade de pontos no entorno de 300 metros e a densidade por quilômetro quadrado.</caption>
     <thead><tr><th scope="col">Tipo</th><th scope="col">Mais próximo</th><th scope="col" class="num">Distância</th><th scope="col" class="num">A pé</th><th scope="col" class="num">Nota</th><th scope="col" class="num">Até 500 m</th><th scope="col" class="num">Até 1 km</th></tr></thead>
     <tbody id="tipos"></tbody></table></div>
   </section>
@@ -100,7 +100,7 @@
    </section>
    <section class="card" aria-labelledby="vit-tabela-titulo">
     <h3 id="vit-tabela-titulo">Oferta por categoria no distrito</h3>
-    <div class="table-wrap"><table><caption class="sr-only">Equipamentos por categoria no distrito, densidade por quilômetro quadrado e por 10 mil habitantes e posição entre os distritos. As densidades não incluem a iluminação pública, que é outra grandeza; sua quantidade entra na contagem da categoria.</caption>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Tabela em rolagem horizontal e vertical"><table><caption class="sr-only">Equipamentos por categoria no distrito, densidade por quilômetro quadrado e por 10 mil habitantes e posição entre os distritos. As densidades não incluem a iluminação pública, que é outra grandeza; sua quantidade entra na contagem da categoria.</caption>
      <thead><tr><th scope="col">Categoria</th><th scope="col" class="num"><abbr title="Equipamentos no distrito">Qtde.</abbr></th><th scope="col" class="num">Por km²</th><th scope="col" class="num"><abbr title="Por 10 mil habitantes">Por 10 mil</abbr></th><th scope="col" class="num">Posição</th></tr></thead>
      <tbody id="vitalidade"></tbody></table></div>
    </section>
@@ -119,7 +119,7 @@
 
  <div role="tabpanel" id="painel-tabela" aria-labelledby="aba-tabela" tabindex="0" hidden>
   <section class="card">
-   <div class="table-wrap"><table><caption>Todos os equipamentos públicos a até 1 km do ponto consultado (o mesmo conteúdo do mapa)</caption>
+   <div class="table-wrap" tabindex="0" role="region" aria-label="Tabela em rolagem horizontal e vertical"><table><caption>Todos os equipamentos públicos a até 1 km do ponto consultado (o mesmo conteúdo do mapa)</caption>
     <thead><tr><th scope="col">Categoria</th><th scope="col">Tipo</th><th scope="col">Nome</th><th scope="col" class="num">Distância</th><th scope="col" class="num">A pé</th></tr></thead>
     <tbody id="entorno"></tbody></table></div>
   </section>

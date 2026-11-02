@@ -1,7 +1,8 @@
 // Tela de diagnóstico do endereço (UC01 a UC04). JavaScript da página, servido
 // como estático; o Leaflet continua global (variável L).
 
-import { $, el, num, int, distancia, minutos, getJSON, corCss } from './util.js';
+import { $, el, num, int, distancia, minutos, getJSON, corCss, atualizarUrl } from './util.js';
+import { instalarBarraDeAcessibilidade, instalarAtalhos } from './acessibilidade.js';
 
 const CATEGORIAS = {
   lazer_convivencia: ['Lazer e convivência', '--c-lazer'],
@@ -174,6 +175,22 @@ async function desenharMapa(d) {
 }
 
 // ---------- renderização ----------
+function estadoVazio(titulo) {
+  $('local-titulo').textContent = titulo;
+  $('local-distrito').textContent = '';
+  $('local-aviso').textContent = 'Os índices aparecem depois de uma consulta válida; as abas já podem ser percorridas pelo teclado.';
+  $('ipl').textContent = '—';
+  $('ivep').textContent = '—';
+  $('ivep-mediana').textContent = '';
+  $('occ-janela').textContent = '';
+  $('occ-subnotificacao').textContent = '';
+  $('occ-observacao').textContent = '';
+  for (const id of ['ipl-categorias', 'ivep-categorias', 'ocorrencias', 'lista-fontes']) $(id).replaceChildren();
+  linhaVazia($('tipos'), 7, 'Sem dados: consulte um endereço.');
+  linhaVazia($('vitalidade'), 5, 'Sem dados: consulte um endereço.');
+  linhaVazia($('entorno'), 5, 'Sem dados: consulte um endereço.');
+}
+
 function linhaVazia(tbody, colunas, texto) {
   tbody.replaceChildren(el('tr', {}, el('td', { colSpan: colunas, text: texto })));
 }
@@ -296,16 +313,15 @@ async function render(resposta, soPesos) {
   const d = resposta.diagnostico;
   state.dados = resposta;
   state.distrito = resposta.local.distrito;
-  $('resultado').hidden = false;
   $('fora').hidden = true;
   const titulo = state.endereco
-    ? [state.endereco.logradouro, state.endereco.bairro].filter(Boolean).join(', ') || `CEP ${state.endereco.cep}`
+    ? [state.endereco.logradouro, state.endereco.numero && `nº ${state.endereco.numero}`,
+       state.endereco.bairro].filter(Boolean).join(', ') || `CEP ${state.endereco.cep}`
     : 'Ponto escolhido no mapa';
   $('local-titulo').textContent = titulo;
   $('local-distrito').textContent = `Distrito: ${state.distrito.nome}`;
-  $('local-aviso').textContent = state.endereco
-    ? 'A localização obtida pelo CEP é aproximada: ela identifica o distrito, mas não a posição exata do imóvel.'
-    : 'Diagnóstico do ponto clicado no mapa.';
+  $('local-aviso').textContent = resposta.local.aviso_localizacao
+    || 'Diagnóstico do ponto clicado no mapa.';
   renderProximidade(d.proximidade);
   renderVitalidade(d.vitalidade);
   renderOcorrencias(d.ocorrencias);
@@ -317,8 +333,10 @@ async function render(resposta, soPesos) {
 async function diagnosticar(alvo, soPesos = false) {
   const pedido = ++state.pedido;
   const query = new URLSearchParams(pesos());
-  if (alvo.cep) query.set('cep', alvo.cep);
-  else {
+  if (alvo.cep) {
+    query.set('cep', alvo.cep);
+    if (alvo.numero) query.set('numero', alvo.numero);
+  } else {
     query.set('lat', alvo.lat.toFixed(6));
     query.set('lon', alvo.lon.toFixed(6));
   }
@@ -328,12 +346,13 @@ async function diagnosticar(alvo, soPesos = false) {
     const resposta = await getJSON(`/api/diagnostico?${query}`);
     if (pedido !== state.pedido) return;
     if (alvo.cep) state.endereco = resposta.local.endereco || null;
+    state.origem = resposta.local.origem_coordenada;
     if (!resposta.diagnostico && !alvo.cep && state.dados) {
       anunciar(`${resposta.aviso} Escolha um ponto dentro da cidade.`, true);
       return;
     }
     if (!resposta.diagnostico) {
-      $('resultado').hidden = true;
+      estadoVazio('Nenhum endereço consultado');
       $('fora').hidden = false;
       const endereco = [resposta.local.endereco?.logradouro, resposta.local.endereco?.municipio].filter(Boolean).join(', ');
       $('fora-texto').textContent = `${resposta.aviso}${endereco ? ` (${endereco})` : ''}`
@@ -351,7 +370,7 @@ async function diagnosticar(alvo, soPesos = false) {
       + `vitalidade ${num.format(d.vitalidade.ivep)}, de 100.`);
     if (!soPesos) {
       $('local-titulo').focus();
-      if (alvo.cep) history.replaceState(null, '', `?cep=${alvo.cep}`);
+      if (alvo.cep) atualizarUrl({ cep: alvo.cep, numero: alvo.numero || '' });
     }
   } catch (erro) {
     if (pedido === state.pedido) anunciar(erro.message, true);
@@ -368,17 +387,100 @@ $('cep').addEventListener('input', (evento) => {
 $('form').addEventListener('submit', (evento) => {
   evento.preventDefault();
   const cep = $('cep').value.replace(/\D/g, '');
-  if (cep.length !== 8) {
-    anunciar('O CEP deve ter 8 números.', true);
-    $('cep').focus();
+  const numero = $('numero').value.trim();
+  const logradouro = $('logradouro').value.trim();
+  if (cep.length === 8) {
+    fecharCandidatos();
+    diagnosticar({ cep, numero });
     return;
   }
-  diagnosticar({ cep });
+  if (logradouro.length >= 3) {
+    buscarEndereco(logradouro, numero);
+    return;
+  }
+  anunciar('Digite os 8 números do CEP ou, se não souber, o nome da rua com o número do imóvel.', true);
+  $('cep').focus();
 });
 
-const inicial = new URLSearchParams(location.search).get('cep');
-if (inicial) {
-  $('cep').value = inicial;
-  $('cep').dispatchEvent(new Event('input'));
-  diagnosticar({ cep: inicial.replace(/\D/g, '') });
+// Busca por endereço: o ViaCEP devolve os CEPs do logradouro e o número escolhe
+// o trecho; quando há mais de um candidato, a lista aparece abaixo do campo.
+async function buscarEndereco(logradouro, numero) {
+  const query = new URLSearchParams({ logradouro });
+  if (numero) query.set('numero', numero);
+  anunciar('Buscando o endereço…');
+  try {
+    const resposta = await getJSON(`/api/enderecos?${query}`);
+    mostrarCandidatos(resposta, numero);
+  } catch (erro) {
+    anunciar(erro.message, true);
+  }
 }
+
+function mostrarCandidatos(resposta, numero) {
+  const caixa = $('candidatos');
+  caixa.replaceChildren();
+  if (!resposta.candidatos.length) {
+    caixa.hidden = true;
+    anunciar(resposta.mensagem || 'Nenhum endereço encontrado.', true);
+    return;
+  }
+  if (resposta.sugerido != null) {
+    const escolhido = resposta.candidatos[resposta.sugerido];
+    caixa.hidden = true;
+    if (escolhido.latitude != null && !escolhido.cep) {
+      diagnosticar({ lat: escolhido.latitude, lon: escolhido.longitude });
+    } else {
+      diagnosticar({ cep: escolhido.cep, numero: numero || escolhido.numero });
+    }
+    return;
+  }
+  caixa.hidden = false;
+  caixa.append(el('p', { class: 'hint', text: resposta.mensagem || 'Escolha um endereço da lista:' }));
+  const lista = el('ul', { class: 'candidatos-lista' });
+  for (const candidato of resposta.candidatos) {
+    const rotulo = [candidato.logradouro, candidato.numero && `nº ${candidato.numero}`, candidato.complemento,
+      candidato.predio, candidato.bairro, candidato.cep && `CEP ${candidato.cep}`].filter(Boolean).join(' · ');
+    const botao = el('button', { type: 'button', class: 'candidato', text: rotulo });
+    botao.addEventListener('click', () => {
+      fecharCandidatos();
+      if (candidato.cep) diagnosticar({ cep: candidato.cep, numero: candidato.numero });
+      else diagnosticar({ lat: candidato.latitude, lon: candidato.longitude });
+    });
+    lista.append(el('li', {}, botao));
+  }
+  caixa.append(lista);
+  anunciar(`${resposta.candidatos.length} endereços encontrados. Escolha um na lista abaixo do campo.`);
+}
+
+function fecharCandidatos() {
+  const caixa = $('candidatos');
+  caixa.replaceChildren();
+  caixa.hidden = true;
+}
+
+// ---------- inicialização ----------
+estadoVazio('Nenhum endereço consultado');
+instalarBarraDeAcessibilidade({ anunciar });
+instalarAtalhos();
+
+const inicial = new URLSearchParams(location.search);
+const cepInicial = inicial.get('cep');
+if (cepInicial) {
+  $('cep').value = cepInicial;
+  $('cep').dispatchEvent(new Event('input'));
+  $('numero').value = inicial.get('numero') || '';
+  diagnosticar({ cep: cepInicial.replace(/\D/g, ''), numero: $('numero').value });
+}
+
+// Ao trocar o contraste, as cores vêm de novas variáveis CSS: repinta o mapa.
+new MutationObserver(() => {
+  for (const categoria of Object.keys(CATEGORIAS)) {
+    const swatch = $(`f-${categoria}`)?.parentElement.querySelector('.swatch');
+    if (swatch) swatch.style.background = cor(categoria);
+    for (const camada of camadas.categorias[categoria].getLayers()) camada.setStyle?.({ fillColor: cor(categoria) });
+  }
+  if (state.dados) {
+    renderProximidade(state.dados.diagnostico.proximidade);
+    renderVitalidade(state.dados.diagnostico.vitalidade);
+  }
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
