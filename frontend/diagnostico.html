@@ -16,15 +16,33 @@
  <nav class="top-nav" aria-label="Seções do site"><a href="/" aria-current="page">Diagnóstico do endereço</a><a href="/explorar">Explorar ocorrências</a><a href="#como-calculamos">Como calculamos</a><a href="#fontes">Fontes dos dados</a></nav>
 </div></header>
 
+<div class="a11y-bar" id="acessibilidade" aria-labelledby="a11y-titulo">
+ <p class="sr-only" id="a11y-titulo">Controles de acessibilidade</p>
+</div>
+<p class="a11y-help" id="a11y-atalhos">Atalhos de teclado: Alt+1 conteúdo, Alt+2 menu, Alt+3 consulta, Alt+4 mapa.</p>
+
 <main id="conteudo">
 <section class="card" id="consulta" aria-labelledby="consulta-titulo">
  <h2 id="consulta-titulo">Consulte um endereço de São Paulo</h2>
  <form class="search" id="form" role="search" novalidate>
-  <div><label for="cep">CEP</label><input id="cep" name="cep" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" aria-describedby="cep-ajuda">
-   <p id="cep-ajuda" class="hint">Digite os 8 números do CEP. Depois de uma consulta, você também pode clicar no mapa para ver outro ponto.</p></div>
+  <div class="campo">
+   <label for="cep">CEP</label>
+   <input id="cep" name="cep" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" aria-describedby="cep-ajuda">
+  </div>
+  <div class="campo">
+   <label for="numero">Número do imóvel <span class="muted">(opcional)</span></label>
+   <input id="numero" name="numero" inputmode="numeric" autocomplete="address-line2" maxlength="7" placeholder="1578" aria-describedby="numero-ajuda">
+  </div>
+  <div class="campo campo-largo">
+   <label for="logradouro">Rua ou avenida <span class="muted">(se não souber o CEP)</span></label>
+   <input id="logradouro" name="logradouro" autocomplete="address-line1" placeholder="Avenida Paulista" aria-describedby="cep-ajuda">
+  </div>
   <button class="btn" id="consultar" type="submit">Ver diagnóstico</button>
  </form>
- <div id="status" class="status" role="status" aria-live="polite">Informe um CEP para ver a infraestrutura pública do entorno e os indicadores do distrito.</div>
+ <p id="cep-ajuda" class="hint">Digite os 8 números do CEP — ou, sem o CEP, o nome da rua com o número do imóvel. Depois de uma consulta, você também pode clicar no mapa para ver outro ponto.</p>
+ <p id="numero-ajuda" class="hint">O número melhora a posição em avenidas longas e a escolha do CEP quando o logradouro tem vários trechos.</p>
+ <div id="status" class="status" role="status" aria-live="polite">Informe um endereço para ver a infraestrutura pública do entorno e os indicadores do distrito.</div>
+ <div id="candidatos" class="candidatos" hidden></div>
 </section>
 
 <section id="fora" class="card warning" hidden aria-labelledby="fora-titulo"><h2 id="fora-titulo">Endereço fora do município</h2><p id="fora-texto"></p></section>
@@ -45,14 +63,14 @@
    <section class="card" aria-labelledby="mapa-titulo">
     <h3 id="mapa-titulo">Mapa do entorno</h3>
     <div id="map" role="region" aria-label="Mapa com o ponto consultado, o limite do distrito, os raios de 500 metros e 1 quilômetro e os equipamentos públicos. O mesmo conteúdo está na aba Ver como tabela."></div>
-    <fieldset class="filters"><legend class="sr-only">Mostrar no mapa as categorias</legend><div id="filtros"></div></fieldset>
-    <p class="hint">Círculos tracejados: 500 m e 1 km em linha reta. Linha contínua: limite do distrito.</p>
+    <fieldset class="filters"><legend class="sr-only">Mostrar no mapa as categorias</legend><div id="filtros" class="filtros-inner"></div></fieldset>
+    <p class="hint">Círculos tracejados: 500 m e 1 km em linha reta. Linha contínua: limite do distrito. A iluminação pública não aparece como ponto: ela entra como densidade de pontos no entorno.</p>
    </section>
    <div class="stack">
     <section class="card" aria-labelledby="ipl-titulo">
      <h3 id="ipl-titulo">Índice de Proximidade Local</h3>
      <div class="score"><strong id="ipl">—</strong><span>de 100</span></div>
-     <p class="compare">Quão perto o endereço está dos equipamentos que trazem gente às ruas. Distâncias em linha reta a partir do CEP.</p>
+     <p class="compare">Quão perto o endereço está dos equipamentos que trazem gente às ruas. Distâncias em linha reta a partir do ponto consultado.</p>
      <ul class="bars" id="ipl-categorias"></ul>
     </section>
     <section class="card" aria-labelledby="pesos-titulo">
@@ -64,7 +82,7 @@
   </div>
   <section class="card" style="margin-top:14px" aria-labelledby="tipos-titulo">
    <h3 id="tipos-titulo">Equipamento mais próximo de cada tipo</h3>
-   <div class="table-wrap"><table><caption class="sr-only">Equipamento mais próximo de cada tipo, com distância em linha reta, tempo a pé, nota e quantidade a até 500 metros e 1 quilômetro</caption>
+   <div class="table-wrap"><table><caption class="sr-only">Equipamento mais próximo de cada tipo: distância em linha reta, tempo a pé, nota e quantidade a até 500 metros e 1 quilômetro. Para a iluminação pública, a coluna de nome traz a quantidade de pontos no entorno de 300 metros e a densidade por quilômetro quadrado.</caption>
     <thead><tr><th scope="col">Tipo</th><th scope="col">Mais próximo</th><th scope="col" class="num">Distância</th><th scope="col" class="num">A pé</th><th scope="col" class="num">Nota</th><th scope="col" class="num">Até 500 m</th><th scope="col" class="num">Até 1 km</th></tr></thead>
     <tbody id="tipos"></tbody></table></div>
   </section>
@@ -76,13 +94,13 @@
     <h3 id="ivep-titulo">Índice de Vitalidade do Espaço Público</h3>
     <div class="score"><strong id="ivep">—</strong><span>de 100</span></div>
     <p class="compare" id="ivep-mediana"></p>
-    <p class="hint">Mede a oferta de equipamentos do distrito inteiro, por área e por habitante, em comparação com os outros 95 distritos. 50 é o meio da cidade.</p>
+    <p class="hint">Mede a oferta de equipamentos do distrito inteiro, por área e por habitante, em comparação com os outros 95 distritos. 50 é o meio da cidade. A posição da categoria é a média das posições dos seus tipos.</p>
     <ul class="bars" id="ivep-categorias" aria-describedby="ivep-legenda"></ul>
     <p class="hint" id="ivep-legenda">A barra mostra a posição do distrito entre os 96 (0 = menor oferta, 100 = maior).</p>
    </section>
    <section class="card" aria-labelledby="vit-tabela-titulo">
     <h3 id="vit-tabela-titulo">Oferta por categoria no distrito</h3>
-    <div class="table-wrap"><table><caption class="sr-only">Equipamentos por categoria no distrito, densidade por quilômetro quadrado e por 10 mil habitantes e posição entre os distritos</caption>
+    <div class="table-wrap"><table><caption class="sr-only">Equipamentos por categoria no distrito, densidade por quilômetro quadrado e por 10 mil habitantes e posição entre os distritos. As densidades não incluem a iluminação pública, que é outra grandeza; sua quantidade entra na contagem da categoria.</caption>
      <thead><tr><th scope="col">Categoria</th><th scope="col" class="num"><abbr title="Equipamentos no distrito">Qtde.</abbr></th><th scope="col" class="num">Por km²</th><th scope="col" class="num"><abbr title="Por 10 mil habitantes">Por 10 mil</abbr></th><th scope="col" class="num">Posição</th></tr></thead>
      <tbody id="vitalidade"></tbody></table></div>
    </section>
@@ -111,14 +129,19 @@
 
 <footer class="method">
  <details id="como-calculamos"><summary>Como calculamos</summary>
-  <p><strong>Proximidade (IPL).</strong> Para cada tipo de equipamento, medimos a distância em linha reta do ponto do CEP até o mais próximo. Até uma distância ideal a nota é 100; a partir de uma distância máxima é 0; no meio, cai aos poucos. Exemplo: ponto de ônibus tem nota 100 até 300 m e 0 a partir de 800 m. A nota de cada categoria é a média dos seus tipos, e o índice é a média das categorias, com os pesos que você escolher. Tipos sem dados na fonte ficam fora da conta, com aviso.</p>
-  <p><strong>Vitalidade (IVEP).</strong> Contamos os equipamentos de cada categoria no distrito e calculamos quantos há por km² e por 10 mil moradores. Comparamos com os outros 95 distritos: a posição vai de 0 (menor oferta) a 100 (maior). O índice é a média das posições, com os seus pesos.</p>
+  <p><strong>Proximidade (IPL).</strong> Para cada tipo de equipamento, medimos a distância em linha reta do ponto consultado até o mais próximo. Até uma distância ideal a nota é 100; a partir de uma distância máxima é 0; no meio, cai aos poucos. Exemplo: ponto de ônibus tem nota 100 até 300 m e 0 a partir de 800 m. A nota de cada categoria é a média dos seus tipos, e o índice é a média das categorias, com os pesos que você escolher. Tipos sem dados na fonte ficam fora da conta, com aviso.</p>
+  <p><strong>Iluminação pública.</strong> Como há luminárias em quase toda a cidade, a distância até a mais próxima não distinguiria um bairro do outro. Medimos então a densidade de pontos cadastrados pela Prefeitura em um raio de 300 metros: nota 0 até 150 pontos por km² e nota 100 a partir de 1.500/km², crescendo linearmente no meio. Ela conta como um tipo da categoria conectividade e permanência.</p>
+  <p><strong>Vitalidade (IVEP).</strong> Contamos os equipamentos de cada tipo no distrito e calculamos quantos há por km² e por 10 mil moradores. Comparamos com os outros 95 distritos: a posição vai de 0 (menor oferta) a 100 (maior). A posição da categoria é a média das posições dos seus tipos — assim uma camada muito densa, como a de iluminação, não abafa as demais. A iluminação é comparada só por área. O índice é a média das posições das categorias, com os seus pesos.</p>
   <p><strong>Ocorrências.</strong> Taxa por 100 mil moradores por ano, nos três últimos anos completos (o ano em curso não entra, porque ainda está incompleto). Só contam registros com localização dentro do distrito. Com menos de 30 registros no período, não mostramos taxa nem tendência. A tendência compara o último ano com o primeiro: variação de 10% ou mais é "alta" ou "queda".</p>
   <p><strong>Por que não há nota única de segurança.</strong> Infraestrutura e registros policiais medem coisas diferentes e são mostrados lado a lado, nunca somados. Registros policiais dependem de a pessoa procurar a polícia, e em distritos com muito movimento e poucos moradores, como o centro, a taxa por morador fica muito alta porque a maioria das pessoas que circulam ali mora em outro lugar.</p>
+  <p><strong>Limitações das fontes.</strong> O GeoSampa é a fonte oficial das praças e largos, mas o servidor deles devolve erro interno de certificado ao exportar essa camada; enquanto isso, a categoria lazer e convivência é medida pelos parques municipais. A camada de áreas verdes e unidades de conservação também falha. Não usamos web scraping nem relatos de moradores.</p>
  </details>
  <details id="fontes"><summary>Fontes dos dados</summary>
   <ul id="lista-fontes"><li>Faça uma consulta para ver as datas de referência de cada fonte.</li></ul>
-  <p>Mapa base © colaboradores do OpenStreetMap. Camadas do GeoSampa sob licença CC BY-SA. Código sob GNU AGPL-3.0.</p>
+  <p>Mapa base © colaboradores do OpenStreetMap (ODbL), camadas do GeoSampa sob licença CC BY-SA, dados da SSP-SP e população do IBGE (Censo 2022). Endereços: ViaCEP, BrasilAPI e Nominatim/OpenStreetMap (ODbL). Código sob GNU AGPL-3.0.</p>
+ </details>
+ <details id="acessibilidade-nota"><summary>Acessibilidade</summary>
+  <p>A plataforma segue a WCAG 2.1 nível AA e a especificação WAI-ARIA: navegação por abas com setas do teclado, anúncio das consultas concluídas e dos erros em região viva, todo o conteúdo do mapa repetido em tabela, controles de alto contraste e de tamanho de fonte, links para pular ao conteúdo e atalhos Alt+1 a Alt+4. As tabelas usam cabeçalhos com escopo e os gráficos de barra têm descrição textual.</p>
  </details>
 </footer>
 
