@@ -122,37 +122,32 @@ O workflow `.github/workflows/ci.yml` roda a cada push e pull request, com Pytho
 
 ## Testes
 
-A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o comportamento esperado pela especificação de requisitos (`relatorio/requisitos_geohabita.tex`) antes da implementação.
-
-`uv sync` já instala as ferramentas de teste. Execute os testes na raiz do projeto:
+A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o
+comportamento esperado pela especificação (`relatorio/requisitos_geohabita.tex`)
+antes da implementação. Rode na raiz do projeto, com `uv` instalado (`uv sync` já
+instala as ferramentas de teste):
 
 ```bash
 uv run pytest
 ```
 
-Sem uv, instale as dependências com `py -m pip install -r requirements-dev.txt` e troque `uv run` por `py -m`.
+| Comando | O que roda |
+|---|---|
+| `uv run pytest` | tudo: unidade, integração e interface |
+| `uv run pytest -m "not integracao and not e2e"` | só unidade — rápido, sem banco nem navegador |
+| `uv run pytest -m integracao` | integração com PostGIS (banco `geohabita_teste_*` descartável) |
+| `uv run pytest -m e2e --browser chromium --browser firefox` | interface em navegador real (Playwright + axe-core) |
+| `uv run pytest -m "not integracao and not e2e" --cov=geohabita --cov-fail-under=70` | cobertura das regras de negócio (porta do RNF11) |
+| `uv run pytest -m "not e2e" --cov=geohabita --cov=backend --cov=scripts --cov-report=html` | cobertura completa, HTML em `htmlcov/` |
 
-Para medir a cobertura das regras de negócio (meta de 70% do RNF11, a porta que a integração contínua exige):
+Os marcadores `integracao` e `e2e` exigem ambiente além do Python: o primeiro
+cria e apaga um banco descartável no servidor de `DATABASE_URL` (nunca toca o
+banco real); o segundo roda num navegador e não precisa de banco. Sem esses
+ambientes, cada grupo é pulado.
 
-```bash
-uv run pytest -m "not integracao and not e2e" --cov=geohabita --cov-fail-under=70
-```
-
-Para incluir também a API e os scripts do pipeline no relatório:
-
-```bash
-uv run pytest -m "not e2e" --cov=geohabita --cov=backend --cov=scripts
-```
-
-Três marcadores separam os testes que exigem mais que o Python: `integracao` (banco PostGIS real), `e2e` (interface com Playwright e axe-core, depois de `uv run playwright install chromium firefox`) e os cenários Gherkin das histórias Must em `tests/aceitacao/` (pytest-bdd). Os testes `integracao` criam um banco descartável `geohabita_teste_*` no servidor apontado por `DATABASE_URL` — o usuário precisa poder criar bancos —, aplicam o esquema, inserem dados fictícios e apagam tudo ao fim; o banco de `DATABASE_URL` nunca é alterado. Sem `DATABASE_URL`, eles são pulados. Os testes `e2e` não precisam de banco: as rotas `/api/*` são respondidas pelos arquivos de `tests/e2e/respostas`, e o axe-core está em `tests/vendor`. Eles auditam as duas telas pelas regras WCAG 2.1 A/AA, testam teclado, região viva, contraste, reflow em 360 px, comparação e exportação, e rodam em mais de um navegador com `uv run pytest -m e2e --browser chromium --browser firefox`. Para regravar as respostas depois de mudar a API, use `uv run --env-file .env scripts/capturar_respostas.py --base http://127.0.0.1:8000` com a aplicação rodando. Para rodar só os de unidade, como o primeiro job da integração contínua: `uv run pytest -m "not integracao and not e2e"`; para um grupo, `uv run pytest -m integracao` ou `uv run pytest -m e2e`.
-
-A especificação, os testes e o código são organizados por regra:
-
-- `geohabita/domain/` reúne as regras de negócio puras, sem acesso a banco de dados, rede ou interface.
-- `geohabita/application/` reúne os casos de uso que coordenam o domínio e os serviços externos, recebidos como dependências para que possam ser substituídos por dublês nos testes.
-- `tests/domain/` e `tests/application/` reúnem os testes correspondentes, com referência à regra (RN), ao requisito (RF/RNF) ou ao caso de teste (CT) da especificação.
-
-Cada módulo de domínio cobre um bloco do modelo de indicadores: `cep.py` (validação e normalização de CEP), `thresholds.py` (limiares de distância por tipo de equipamento), `proximity.py` (nota por tipo, tempo de caminhada e IPL), `vitality.py` (IVEP), `rates.py` (taxas oficiais de ocorrências e janela de anos completos), `territory.py` (endereço fora do município), `freshness.py` (validade do cache e dado desatualizado), `data_quality.py` (descarte de coordenadas na carga), `equipment.py` (equipamentos do entorno) e `diagnosis.py` (blocos separados do diagnóstico). Também há `lighting.py` (nota da iluminação pela densidade de pontos) e `address.py` (número do imóvel e faixas de numeração dos CEPs). Na camada de aplicação, `cep_lookup.py` cobre a consulta de CEP com contingência, `address_search.py` a busca por rua e número, `geocoding.py` o cache de 30 dias das coordenadas, e `rate_limit.py` o limite de requisições por IP. O cache de CEP, de geocodificação e de logradouros fica na tabela `cache_consulta` e sobrevive a reinícios (RN04). A busca por endereço fica em `/api/enderecos?logradouro=...&numero=...`. As funções de domínio e de aplicação estão implementadas e a suíte completa passa. A API já usa a validação de CEP do domínio, geocodifica o CEP (BrasilAPI, depois a mediana das ocorrências registradas na mesma rua e, por fim, o Nominatim do OpenStreetMap), expõe a consulta de endereço em `/api/cep/{cep}` (ViaCEP com contingência na BrasilAPI) e limita as rotas `/api/` a 60 requisições por minuto por IP. O diagnóstico socioespacial fica em `/api/diagnostico?cep=...&numero=...` (ou `?lat=...&lon=...`), com os pesos opcionais `peso_<categoria>` de 0 a 5; a resposta tem três blocos independentes: proximidade e IPL do endereço, vitalidade e IVEP do distrito, e taxas de ocorrências por natureza na janela dos três últimos anos completos. Ele depende da etapa `indicadores` do pipeline. A lógica está em `geohabita/application/diagnosis.py` e as consultas espaciais em `geohabita/infrastructure/postgis.py`. O alvo de cobertura de 70% das regras de negócio vem do RNF11.
+Pré-requisitos, o passo a passo recomendado, relatórios de cobertura e de
+resultados e a solução de problemas estão em
+[`tests/README.md`](tests/README.md).
 
 ## Dados
 
