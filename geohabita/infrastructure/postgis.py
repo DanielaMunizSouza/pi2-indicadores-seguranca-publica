@@ -84,6 +84,16 @@ class PostgisDiagnosisRepository:
                            "folga": radius_m * GRAUS_POR_METRO * 1.5})
         return [NearbyEquipment(tipo, nome or "sem nome", float(d), lat, lon) for tipo, nome, d, lat, lon in rows]
 
+    def lighting_within(self, latitude: float, longitude: float, radius_m: int) -> int:
+        """Pontos de iluminação pública a até ``radius_m`` metros do endereço."""
+        rows = self._rows("""SELECT count(*) FROM public.equipamento_publico
+            WHERE tipo = 'iluminacao_publica' AND geometria && ST_Expand(%(ponto)s, %(folga)s)
+              AND ST_DWithin(geometria::geography, %(ponto)s::geography, %(raio)s)""".replace(
+            "%(ponto)s", PONTO),
+            {"lat": latitude, "lon": longitude, "raio": radius_m,
+             "folga": radius_m * GRAUS_POR_METRO * 1.5})
+        return int(rows[0][0])
+
     def district_indicators(self) -> dict[str, dict[tuple[str, str, int], float]]:
         def load() -> dict[str, dict[tuple[str, str, int], float]]:
             dados: dict[str, dict[tuple[str, str, int], float]] = {}

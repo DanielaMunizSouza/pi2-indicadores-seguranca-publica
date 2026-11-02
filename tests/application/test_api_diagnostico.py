@@ -17,7 +17,7 @@ class FakeService:
         self.error = error
         self.calls = []
 
-    def diagnose_cep(self, cep, pesos):
+    def diagnose_cep(self, cep, pesos, numero=None):
         self.calls.append(("cep", cep, pesos))
         if self.error:
             raise self.error

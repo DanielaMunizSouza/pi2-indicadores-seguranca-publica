@@ -103,3 +103,16 @@ CREATE TABLE IF NOT EXISTS public.indicador_distrito (
 -- Busca de vizinhos do diagnóstico sem percorrer os ~663 mil postes de iluminação.
 CREATE INDEX IF NOT EXISTS ix_equipamento_geometria_diagnostico ON public.equipamento_publico
  USING gist(geometria) WHERE tipo <> 'iluminacao_publica';
+-- Cache de 30 dias das consultas externas de CEP e geocodificação (RN04), que
+-- sobrevive a reinícios da aplicação. Guarda só o endereço consultado, nunca quem consultou (RNF15).
+CREATE TABLE IF NOT EXISTS public.cache_consulta (
+ espaco text NOT NULL, chave text NOT NULL, valor jsonb, obtido_em timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(espaco,chave)
+);
+-- Auditoria de carga (RF19, RN10): além de "sem coordenada", conta os registros
+-- cuja coordenada cai fora dos 96 distritos, e passa a valer para todas as fontes.
+ALTER TABLE public.carga_etl ADD COLUMN IF NOT EXISTS registros_fora_do_municipio bigint NOT NULL DEFAULT 0;
+-- Uma linha por fonte+arquivo: mantém só a execução mais recente de cada um.
+DELETE FROM public.carga_etl a USING public.carga_etl b
+ WHERE a.fonte = b.fonte AND a.arquivo = b.arquivo AND a.executada_em < b.executada_em;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_carga_fonte_arquivo ON public.carga_etl(fonte,arquivo);

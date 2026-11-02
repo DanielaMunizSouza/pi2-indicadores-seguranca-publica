@@ -1,0 +1,448 @@
+/* Tela de diagnóstico. Estilos gerais (cores, cartão, abas, tabelas, acessibilidade)
+   estão em base.css; aqui ficam só os arranjos próprios desta tela. */
+
+.search {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 1fr) minmax(220px, 1.4fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.search label, .comp-busca label {
+  display: block;
+  font-weight: 800;
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+.search input, .comp-busca input {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #8ebdb7;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 18px;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+  background: #f7fbfa;
+}
+
+.candidatos {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.candidatos-lista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.candidato {
+  width: 100%;
+  text-align: left;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f7fbfa;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 9px 12px;
+}
+
+.candidato:hover {
+  background: #e8f2f1;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f2f6f7;
+  color: #3d5864;
+  font-size: 15px;
+}
+
+.status.erro {
+  background: #fbefe9;
+  color: #7a3413;
+}
+
+.place {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+  margin: 16px 0 10px;
+}
+
+.place h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.place .district {
+  font-weight: 800;
+  color: var(--teal-dark);
+}
+
+/* Comparação (RF16): a mesma busca da consulta principal e uma tabela por colunas. */
+.comp-busca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  max-width: 760px;
+  margin-top: 6px;
+}
+
+#comparar {
+  margin-top: 16px;
+}
+
+/* Sem altura máxima: a comparação inteira cabe na página; só rola na horizontal. */
+#comparar .table-wrap {
+  max-height: none;
+}
+
+.comp-tabela {
+  min-width: 560px;
+}
+
+.comp-tabela thead th {
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: bottom;
+  border-bottom: 2px solid var(--line);
+  padding: 10px 8px;
+}
+
+.comp-tabela thead th.comp-indicador {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  width: 32%;
+}
+
+.comp-col {
+  min-width: 180px;
+}
+
+.comp-col > span {
+  display: block;
+}
+
+.comp-titulo {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.comp-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 2px 0 6px;
+}
+
+.comp-col .tag {
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.comp-col .comp-remover {
+  display: block;
+}
+
+.comp-tabela tbody td {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Valor logo abaixo do nome do endereço, na mesma coluna e alinhamento. */
+.comp-tabela td.num {
+  text-align: left;
+}
+
+.comp-tabela tr.comp-grupo th {
+  background: #f2f6f7;
+  color: #405963;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding-top: 10px;
+}
+
+.comp-notas {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.acoes-consulta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+[role=tablist] {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--line);
+  margin-top: 6px;
+}
+
+[role=tab] {
+  border: 0;
+  background: none;
+  padding: 11px 14px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+}
+
+[role=tab][aria-selected=true] {
+  color: var(--ink);
+  border-bottom-color: var(--teal);
+}
+
+[role=tabpanel] {
+  padding-top: 14px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+.layout.half {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+abbr {
+  text-decoration: none;
+}
+
+#map {
+  height: min(64vh, 620px);
+  min-height: 380px;
+  border-radius: 10px;
+  background: #e4edef;
+}
+
+.filters {
+  border: 0;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.filtros-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 15px;
+}
+
+.filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.score strong {
+  font-size: 44px;
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.score span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.compare {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 2px 0 10px;
+}
+
+.weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.weights label {
+  display: grid;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.weights select {
+  height: 40px;
+  border: 1px solid #c8d6db;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: #fcfdfd;
+}
+
+.occ-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.occ h3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.occ .bar {
+  grid-template-columns: 110px minmax(60px, 1fr) 70px;
+}
+
+.pair {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.pair .fill.city {
+  background: var(--neutral-soft);
+}
+
+.pair .fill.district {
+  background: var(--neutral);
+}
+
+.trend {
+  font-size: 15px;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 13px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #eef3f5;
+  color: #3f5966;
+}
+
+.method {
+  max-width: 1400px;
+  margin: 18px auto 28px;
+  padding: 0 20px;
+  font-size: 15px;
+  color: #3f5966;
+}
+
+.method details {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.method summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.method p, .method li {
+  max-width: 980px;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.popup-title {
+  font-weight: 800;
+}
+
+#local-titulo:focus {
+  outline: none;
+}
+
+@media (max-width: 980px) {
+  .layout, .layout.half {
+    grid-template-columns: 1fr;
+  }
+
+  #map {
+    height: 52vh;
+    min-height: 320px;
+  }
+
+  .search {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .campo-largo, .search .btn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .comp-busca {
+    grid-template-columns: 1fr;
+  }
+
+  main {
+    padding: 0 10px;
+  }
+
+  .search {
+    grid-template-columns: 1fr;
+  }
+
+  .bar {
+    grid-template-columns: minmax(100px, 1fr) minmax(50px, 1fr) 46px;
+  }
+
+  .score strong {
+    font-size: 36px;
+  }
+
+  [role=tab] {
+    padding: 9px;
+    font-size: 14px;
+  }
+
+  .top-nav {
+    margin-left: 0;
+  }
+
+  .a11y-bar {
+    padding: 0 10px;
+  }
+}

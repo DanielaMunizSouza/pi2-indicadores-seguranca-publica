@@ -12,20 +12,23 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any, Protocol
 
 from geohabita.application.cep_lookup import Address
+from geohabita.domain.address import NUMBER_LOCATION_NOTICE, normalize_number
 from geohabita.domain.diagnosis import build_diagnosis
 from geohabita.domain.freshness import OUTDATED_MESSAGE, is_outdated
 from geohabita.domain.equipment import (
     EQUIPMENT_CATEGORY,
     LISTING_RADII_M,
     NearbyEquipment,
+    missing_lighting_message,
     missing_type_message,
     within_radius,
 )
+from geohabita.domain.lighting import LIGHTING_TYPE, lighting_density, lighting_note, lighting_thresholds
 from geohabita.domain.proximity import (
     category_note,
     local_proximity_index,
@@ -46,10 +49,19 @@ from geohabita.domain.territory import (
     OUT_OF_CITY_MESSAGE,
     is_sao_paulo,
 )
-from geohabita.domain.thresholds import CATEGORIES, EQUIPMENT_THRESHOLDS
+from geohabita.domain.thresholds import (
+    CATEGORIES,
+    DENSITY_TYPES,
+    EQUIPMENT_THRESHOLDS,
+    EQUIPMENT_TYPES,
+)
 from geohabita.domain.vitality import DEFAULT_WEIGHT, is_valid_weight, public_space_vitality_index
 
 STRAIGHT_LINE_LABEL = "distância em linha reta"  # RN12: a interface identifica a medida
+# A iluminação entra no IPL pela densidade de pontos no entorno, não pela distância.
+LIGHTING_LABEL = "densidade de pontos de iluminação no entorno"
+
+
 UNAVAILABLE_LAYER_MESSAGE = (
     "camada indisponível na fonte de dados no momento; o tipo fica fora do cálculo"
 )
@@ -59,6 +71,8 @@ OCCURRENCE_NOTE = (
 )
 
 Geocoder = Callable[[Address], "tuple[float, float] | None"]
+# Nome do geocodificador que localiza o número do imóvel; os demais localizam o CEP.
+NUMBER_GEOCODER = "openstreetmap_numero"
 
 
 @dataclass(frozen=True)
@@ -78,6 +92,7 @@ class DiagnosisRepository(Protocol):
     def nearest_by_type(self, latitude: float, longitude: float, types: Sequence[str]) -> list[NearbyEquipment]: ...
     def equipment_within(self, latitude: float, longitude: float, radius_m: float,
                          types: Sequence[str]) -> list[NearbyEquipment]: ...
+    def lighting_within(self, latitude: float, longitude: float, radius_m: int) -> int: ...  # pontos no entorno
     def district_indicators(self) -> Mapping[str, Mapping[tuple[str, str, int], float]]: ...
     def populations(self) -> Mapping[str, int]: ...
     def data_sources(self) -> list[dict[str, Any]]: ...
@@ -111,18 +126,22 @@ class DiagnosisService:
         self.today = today
 
     # --- entradas ------------------------------------------------------------
-    def diagnose_cep(self, raw_cep: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    def diagnose_cep(self, raw_cep: str, weights: Mapping[str, Any] | None = None,
+                     number: str | None = None) -> dict[str, Any]:
+        """Diagnóstico do CEP; com o número do imóvel, tenta primeiro a posição do próprio número."""
         pesos = validated_weights(weights)
-        address = self.cep_lookup.lookup(raw_cep)
-        endereco = {"cep": address.cep, "logradouro": address.street, "bairro": address.neighbourhood,
-                    "municipio": address.city}
+        numero = normalize_number(number)
+        address = replace(self.cep_lookup.lookup(raw_cep), number=numero)
+        endereco = {"cep": address.cep, "logradouro": address.street, "numero": numero,
+                    "bairro": address.neighbourhood, "municipio": address.city}
         if not is_sao_paulo(address.ibge_code):
             return {"local": {"endereco": endereco}, "dentro_sao_paulo": False,
                     "aviso": OUT_OF_CITY_MESSAGE, "diagnostico": None}
         latitude, longitude, origem = self._locate(address)
         resultado = self._diagnose(latitude, longitude, origem, pesos)
         resultado["local"]["endereco"] = endereco
-        resultado["local"]["aviso_localizacao"] = APPROXIMATE_LOCATION_NOTICE
+        resultado["local"]["aviso_localizacao"] = (
+            NUMBER_LOCATION_NOTICE if origem == NUMBER_GEOCODER else APPROXIMATE_LOCATION_NOTICE)
         return resultado
 
     def diagnose_point(self, latitude: float, longitude: float,
@@ -130,9 +149,16 @@ class DiagnosisService:
         return self._diagnose(latitude, longitude, "informada", validated_weights(weights))
 
     def _locate(self, address: Address) -> tuple[float, float, str]:
+        # A posição do número informado vale mais que a coordenada do CEP, que
+        # em avenidas longas representa um trecho inteiro.
+        by_number = [g for g in self.geocoders if g[0] == NUMBER_GEOCODER]
+        by_cep = [g for g in self.geocoders if g[0] != NUMBER_GEOCODER]
+        for name, geocode in by_number if address.number else []:
+            if (point := geocode(address)) is not None:
+                return point[0], point[1], name
         if address.latitude is not None and address.longitude is not None:
             return address.latitude, address.longitude, "servico_cep"
-        for name, geocode in self.geocoders:
+        for name, geocode in by_cep:
             point = geocode(address)
             if point is not None:
                 return point[0], point[1], name
@@ -168,13 +194,37 @@ class DiagnosisService:
 
     # --- bloco 1: proximidade (RF07, RF23, RF24) -----------------------------
     def proximity(self, latitude: float, longitude: float, pesos: Mapping[str, int]) -> dict[str, Any]:
-        available = sorted(self.repository.available_types() & set(EQUIPMENT_THRESHOLDS))
-        nearest = {e.type: e for e in self.repository.nearest_by_type(latitude, longitude, available)}
-        around = self.repository.equipment_within(latitude, longitude, max(LISTING_RADII_M), available)
+        available = self.repository.available_types() & set(EQUIPMENT_TYPES)
+        # Os tipos medidos por distância são os que o banco consulta por vizinho mais próximo.
+        por_distancia = sorted(available - DENSITY_TYPES)
+        nearest = {e.type: e for e in self.repository.nearest_by_type(latitude, longitude, por_distancia)}
+        raio_ilum, _, _ = lighting_thresholds()
+        iluminacao = self.repository.lighting_within(latitude, longitude, raio_ilum)
+        around = self.repository.equipment_within(latitude, longitude, max(LISTING_RADII_M), por_distancia)
         tipos: dict[str, dict[str, Any]] = {}
-        for tipo, limiar in EQUIPMENT_THRESHOLDS.items():
+        for tipo in EQUIPMENT_TYPES:
+            limiar = EQUIPMENT_THRESHOLDS.get(tipo)
             info: dict[str, Any] = {"categoria": EQUIPMENT_CATEGORY[tipo], "disponivel": tipo in available,
-                                    "ideal_m": limiar.ideal_m, "maxima_m": limiar.max_m}
+                                    "ideal_m": limiar.ideal_m if limiar else None,
+                                    "maxima_m": limiar.max_m if limiar else None}
+            if tipo in DENSITY_TYPES:
+                if not info["disponivel"]:
+                    tipos[tipo] = info | {"nota": None, "distancia_m": None, "nome": None,
+                                          "latitude": None, "longitude": None, "medida": LIGHTING_LABEL,
+                                          "tempo_caminhada_min": None, "ate_500m": None, "ate_1km": None,
+                                          "pontos_no_raio": None, "densidade_km2": None,
+                                          "aviso": UNAVAILABLE_LAYER_MESSAGE}
+                    continue
+                densidade = lighting_density(iluminacao, raio_ilum)
+                nota_ilum = lighting_note(densidade)
+                tipos[tipo] = info | {
+                    "nota": round(nota_ilum, 1), "distancia_m": None, "medida": LIGHTING_LABEL,
+                    "nome": None, "latitude": None, "longitude": None, "tempo_caminhada_min": None,
+                    "ate_500m": None, "ate_1km": None, "raio_medida_m": raio_ilum,
+                    "pontos_no_raio": iluminacao, "densidade_km2": round(densidade),
+                    "aviso": missing_lighting_message(raio_ilum) if iluminacao == 0 else None,
+                }
+                continue
             if tipo not in available:
                 tipos[tipo] = info | {"nota": None, "distancia_m": None, "nome": None,
                                       "latitude": None, "longitude": None,
@@ -199,7 +249,8 @@ class DiagnosisService:
         categorias: dict[str, dict[str, Any]] = {}
         notas, pesos_ipl = [], []
         for categoria in CATEGORIES:
-            notas_tipo = [t["nota"] for t in tipos.values() if t["categoria"] == categoria and t["disponivel"]]
+            notas_tipo = [t["nota"] for t in tipos.values()
+                          if t["categoria"] == categoria and t["disponivel"] and t["nota"] is not None]
             nota = category_note(notas_tipo) if notas_tipo else None
             categorias[categoria] = {"nota": round(nota, 1) if nota is not None else None,
                                      "peso": pesos[categoria],
@@ -236,6 +287,8 @@ class DiagnosisService:
         return {"ivep": round(ivep(dados), 1),
                 "mediana_municipal": round(statistics.median(todos), 1) if todos else None,
                 "categorias": categorias}
+
+
 
     # --- bloco 3: ocorrências (RF10) ------------------------------------------
     def occurrences(self, code: str,

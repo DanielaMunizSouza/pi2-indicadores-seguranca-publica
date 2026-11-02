@@ -6,7 +6,12 @@ import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from backend.app import DB_URL, MUNICIPIOS_SP
+sys.path.insert(0, str(ROOT / "scripts"))
+import cargas
+from geohabita.config import DATABASE_URL as DB_URL
+from geohabita.domain.ssp import SAO_PAULO_NAMES
+
+MUNICIPIOS_SP = list(SAO_PAULO_NAMES)
 
 
 def main() -> None:
@@ -86,6 +91,14 @@ def main() -> None:
         row=conn.execute("SELECT count(*) AS grupos,COALESCE(sum(registros),0) AS registros "
                          "FROM public.resumo_distrito_diario").fetchone()
         print(f"Resumo diário atualizado: {row[0]} combinações; {row[1]} ocorrências georreferenciadas.")
+        # RF19: registra o agregado do mapa (a contagem "sem coordenada" é a do
+        # município inteiro no período importado, que não pode entrar no mapa).
+        sem_local = conn.execute("SELECT count(*) FROM public.registro_ocorrencia"
+                                 " WHERE localizacao IS NULL AND municipio = ANY(%s)",
+                                 (MUNICIPIOS_SP,)).fetchone()[0]
+        total = conn.execute("SELECT count(*) FROM public.registro_ocorrencia"
+                             " WHERE municipio = ANY(%s)", (MUNICIPIOS_SP,)).fetchone()[0]
+        cargas.registrar(conn, "agregacao", "resumo_distrito_diario", "mapa", total, sem_local)
 
 
 if __name__ == "__main__":

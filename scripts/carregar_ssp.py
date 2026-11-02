@@ -16,6 +16,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cargas  # noqa: E402
 from progresso import Progresso, ProgressoRemoto  # noqa: E402
 
 COLUMNS = [
@@ -239,10 +240,14 @@ def carregar_arquivo(path, dsn, fila=None, refazer=False):
             no_point = conn.execute(
                 'SELECT count(*) FROM public.registro_ocorrencia WHERE arquivo_origem = %s AND localizacao IS NULL',
                 (path.name,)).fetchone()[0]
-            conn.execute(
-                'INSERT INTO public.carga_etl (fonte, arquivo, categoria, registros_importados, '
-                'registros_sem_coordenada, assinatura) VALUES (%s, %s, %s, %s, %s, %s)',
-                ('ssp-sp', path.name, category(path.name), count, no_point, sig))
+            # RN10: coordenada válida, mas fora dos 96 distritos do município.
+            fora = conn.execute(
+                "SELECT count(*) FROM public.registro_ocorrencia r"
+                " WHERE r.arquivo_origem = %s AND r.localizacao IS NOT NULL"
+                " AND NOT EXISTS (SELECT 1 FROM public.distrito_municipal_sp d"
+                "                 WHERE d.geometria && r.localizacao AND ST_Intersects(d.geometria, r.localizacao))",
+                (path.name,)).fetchone()[0]
+            cargas.registrar(conn, 'ssp-sp', path.name, category(path.name), count, no_point, fora, sig=sig)
         if progresso:
             progresso.fim(chave, f'{path.name}: {count:,} registros')
     return count, False

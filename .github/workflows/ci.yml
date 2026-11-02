@@ -1,0 +1,107 @@
+# Integração contínua do GeoHabita: testes de unidade com cobertura (RNF11), integração com
+# PostGIS, interface e acessibilidade em Chrome e Firefox (RNF12), auditoria de dependências
+# (RNF09) e build da imagem Docker.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  testes:
+    name: Testes e cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest -m "not integracao and not e2e" --cov=geohabita --cov-fail-under=70
+
+  integracao:
+    name: Integração com PostGIS
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_DB: geohabita_teste
+          POSTGRES_USER: geohabita
+          POSTGRES_PASSWORD: geohabita
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U geohabita -d geohabita_teste"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+    env:
+      DATABASE_URL: postgresql://geohabita:geohabita@localhost:5432/geohabita_teste
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Aplicar o esquema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
+      - run: uv run pytest -m integracao
+
+  e2e-acessibilidade:
+    name: Interface e acessibilidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium firefox
+      # Respostas da API simuladas (tests/e2e/respostas): não precisa de banco.
+      - run: uv run pytest -m e2e --browser chromium --browser firefox
+      - name: Publicar relatórios
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: relatorios-teste
+          path: relatorios-teste/
+          if-no-files-found: ignore
+
+  auditoria:
+    name: Auditoria de dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv export --frozen --no-hashes --format requirements-txt > req.txt
+      - run: uvx pip-audit -r req.txt
+
+  docker:
+    name: Build da imagem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: geohabita-app:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

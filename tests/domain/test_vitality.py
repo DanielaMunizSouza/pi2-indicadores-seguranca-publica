@@ -58,7 +58,7 @@ def test_weight_bounds():
 
 # --- Percentis entre distritos (RN06) ---------------------------------------
 
-from geohabita.domain.vitality import category_percentile, percentile_ranks  # noqa: E402
+from geohabita.domain.vitality import category_percentile, percentile_ranks, type_percentile  # noqa: E402
 
 
 def test_percentile_ranks_spread_from_zero_to_hundred():
@@ -81,4 +81,10 @@ def test_percentile_ranks_of_empty_input_is_empty():
 
 
 def test_category_percentile_averages_area_and_population_densities():
-    assert category_percentile(80.0, 40.0) == pytest.approx(60.0)
+    assert type_percentile(80.0, 40.0) == pytest.approx(60.0)
+
+
+def test_category_percentile_is_the_mean_of_its_types():
+    # Média por tipo, e não por contagem somada: um tipo muito denso (iluminação)
+    # não afoga os demais da categoria.
+    assert category_percentile([100.0, 20.0]) == pytest.approx(60.0)
