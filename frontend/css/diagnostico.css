@@ -357,7 +357,7 @@ abbr {
 }
 
 .method {
-  max-width: 1400px;
+  max-width: var(--largura-max);
   margin: 18px auto 28px;
   padding: 0 20px;
   font-size: 0.9375rem;

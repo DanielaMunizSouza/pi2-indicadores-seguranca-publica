@@ -2,10 +2,6 @@
    controles de acessibilidade) estão em base.css. Nada aqui usa escala cromática
    de alarme: as cores do mapa vêm do JavaScript, em tons de um só matiz (RNF18). */
 
-main {
-  max-width: 1540px;
-}
-
 .dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -15,7 +11,14 @@ main {
 
 .sidebar {
   display: grid;
+  /* minmax(0, 1fr): a coluna não cresce com o conteúdo (a tabela de distritos rola). */
+  grid-template-columns: minmax(0, 1fr);
   gap: 13px;
+  min-width: 0;
+}
+
+.sidebar > * {
+  min-width: 0;
 }
 
 .filter-card {
@@ -370,7 +373,7 @@ main {
 }
 
 .method {
-  max-width: 1540px;
+  max-width: var(--largura-max);
   margin: 15px auto 24px;
   padding: 0 20px;
   color: #405863;

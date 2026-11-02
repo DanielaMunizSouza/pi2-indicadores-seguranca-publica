@@ -8,6 +8,8 @@
 :root {
   color-scheme: light;
   --fonte-base: 100%;
+  /* Largura máxima comum a cabeçalho, barra de acessibilidade, conteúdo e rodapé. */
+  --largura-max: 1400px;
   --ink: #153241;
   --muted: #566e7a;
   --line: #d9e4e8;
@@ -86,12 +88,13 @@ a {
 header {
   background: linear-gradient(115deg, #103746, #164f56 72%, #17736b);
   color: #fff;
-  padding: 16px max(20px, calc((100% - 1400px) / 2));
+  padding: 16px 0;
 }
 
 .head-inner {
-  max-width: 1400px;
+  max-width: var(--largura-max);
   margin: auto;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -135,7 +138,7 @@ h1 {
 }
 
 main {
-  max-width: 1400px;
+  max-width: var(--largura-max);
   margin: 18px auto 0;
   padding: 0 20px;
 }
@@ -326,7 +329,7 @@ td.num, th.num {
 
 /* Controles de acessibilidade fixos (e-MAG): alto contraste, fonte e atalhos. */
 .a11y-bar {
-  max-width: 1400px;
+  max-width: var(--largura-max);
   margin: 0 auto;
   padding: 0 20px;
   display: flex;
@@ -371,9 +374,9 @@ td.num, th.num {
 .a11y-help {
   font-size: 0.875rem;
   color: var(--muted);
-  margin: 0 0 10px;
+  margin: 0 auto 10px;
   padding: 0 20px;
-  max-width: 1400px;
+  max-width: var(--largura-max);
 }
 
 html.alto-contraste {
