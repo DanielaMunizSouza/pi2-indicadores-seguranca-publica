@@ -268,3 +268,6 @@ Thumbs.db
 # _draft
 relatorio_parcial/_draft/
 relatorio/_draft/
+
+# Respostas locais usadas pelos testes de interface (geradas por scripts/capturar_respostas.py)
+data/tmp/
