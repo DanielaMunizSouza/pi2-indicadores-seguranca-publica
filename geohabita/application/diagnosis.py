@@ -283,11 +283,23 @@ class DiagnosisService:
         dados = indicators.get(code, {})
         todos = [v for d in indicators.values() if (v := ivep(d)) is not None]
         indice = ivep(dados)
-        categorias = {c: {"percentil": dados.get(("percentil", c, 0)),
-                          "equipamentos": dados.get(("equipamentos", c, 0)),
-                          "densidade_km2": dados.get(("densidade_km2", c, 0)),
-                          "densidade_10k_hab": dados.get(("densidade_10k_hab", c, 0)),
-                          "peso": pesos[c]} for c in CATEGORIES}
+        def figuras(chave: str) -> dict[str, Any]:
+            return {"percentil": dados.get(("percentil", chave, 0)),
+                    "equipamentos": dados.get(("equipamentos", chave, 0)),
+                    "densidade_km2": dados.get(("densidade_km2", chave, 0)),
+                    "densidade_10k_hab": dados.get(("densidade_10k_hab", chave, 0))}
+
+        def tipo(nome: str) -> dict[str, Any]:
+            # Sem percentil, o tipo não tem dados na fonte e não entra na categoria.
+            info = figuras(nome)
+            disponivel = info["percentil"] is not None
+            return info | {"disponivel": disponivel,
+                           "aviso": None if disponivel else UNAVAILABLE_LAYER_MESSAGE}
+
+        # Os tipos de cada categoria mostram de onde vem a posição dela (média dos tipos).
+        categorias = {c: figuras(c) | {"peso": pesos[c],
+                                       "tipos": {t: tipo(t) for t, cat in EQUIPMENT_TYPES.items() if cat == c}}
+                      for c in CATEGORIES}
         return {"ivep": round(indice, 1) if indice is not None else None,
                 "categorias_no_indice": [c for c in CATEGORIES if dados.get(("percentil", c, 0)) is not None],
                 "mediana_municipal": round(statistics.median(todos), 1) if todos else None,

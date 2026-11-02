@@ -19,7 +19,7 @@ from geohabita.domain.equipment import NearbyEquipment
 from geohabita.domain.lighting import lighting_density, lighting_note
 from geohabita.domain.rates import INSUFFICIENT_DATA_MESSAGE
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE
-from geohabita.domain.thresholds import CATEGORIES
+from geohabita.domain.thresholds import CATEGORIES, EQUIPMENT_TYPES
 
 SE = District("01", "SÉ", "Centro")
 CATEGORIAS = list(CATEGORIES)
@@ -215,6 +215,21 @@ def test_ivep_is_empty_when_only_categories_without_data_have_weight():
     pesos = {c: 0 for c in CATEGORIAS} | {"mobilidade": 3}
     bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63, pesos)["diagnostico"]["vitalidade"]
     assert bloco["ivep"] is None
+
+
+def test_vitality_lists_the_types_behind_each_category():
+    percentis = indicadores({"01": [50] * 6, "02": [10] * 6})
+    percentis["01"] |= {("percentil", "parque_area_verde", 0): 70.0, ("equipamentos", "parque_area_verde", 0): 4,
+                        ("densidade_km2", "parque_area_verde", 0): 0.5,
+                        ("densidade_10k_hab", "parque_area_verde", 0): 0.8}
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63)["diagnostico"]["vitalidade"]
+    tipos = bloco["categorias"]["lazer_convivencia"]["tipos"]
+    assert list(tipos) == ["praca", "parque_area_verde"]
+    assert tipos["parque_area_verde"] == {"percentil": 70.0, "equipamentos": 4, "densidade_km2": 0.5,
+                                          "densidade_10k_hab": 0.8, "disponivel": True, "aviso": None}
+    assert tipos["praca"]["disponivel"] is False and tipos["praca"]["aviso"]
+    todos = [t for c in bloco["categorias"].values() for t in c["tipos"]]
+    assert sorted(todos) == sorted(EQUIPMENT_TYPES)
 
 
 def test_ivep_follows_user_weights():
