@@ -16,6 +16,7 @@ from geohabita.application.diagnosis import (
 )
 from geohabita.domain.diagnosis import DIAGNOSIS_BLOCKS
 from geohabita.domain.equipment import NearbyEquipment
+from geohabita.domain.lighting import lighting_density, lighting_note
 from geohabita.domain.rates import INSUFFICIENT_DATA_MESSAGE
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE
 from geohabita.domain.thresholds import CATEGORIES
@@ -40,7 +41,7 @@ def indicadores(percentis_por_distrito, ocorrencias=None):
 
 class FakeRepository:
     def __init__(self, district=SE, available=None, nearest=(), within=(), indicators=None,
-                 populations=None, centroid=None):
+                 populations=None, centroid=None, lighting=425):
         self.district = district
         self.available = available if available is not None else {
             "parque_area_verde", "ponto_onibus", "estacao_metro_trem", "unidade_basica_saude"}
@@ -49,6 +50,7 @@ class FakeRepository:
         self.indicators = indicators or indicadores({"01": [50] * 6, "02": [10] * 6, "03": [90] * 6})
         self.populations_ = populations or {"01": 100_000, "02": 100_000, "03": 200_000}
         self.centroid = centroid
+        self.lighting = lighting
 
     def district_at(self, lat, lon):
         return self.district
@@ -61,6 +63,9 @@ class FakeRepository:
 
     def equipment_within(self, lat, lon, radius_m, types):
         return [e for e in self.within if e.type in types and e.distance_m <= radius_m]
+
+    def lighting_within(self, lat, lon, radius_m):
+        return self.lighting
 
     def district_indicators(self):
         return self.indicators
@@ -294,3 +299,42 @@ def test_without_number_the_house_number_geocoder_is_not_used():
     r = service(address=endereco, geocoders=[(NUMBER_GEOCODER, lambda a: usado.append(1) or (0.0, 0.0)),
                                              ("outro", lambda a: (-23.55, -46.63))]).diagnose_cep("01001000")
     assert r["local"]["origem_coordenada"] == "outro" and usado == []
+
+
+# --- iluminação pública (densidade no entorno) --------------------------------
+
+def test_lighting_note_uses_density_in_the_neighbourhood():
+    repo = FakeRepository(available={"iluminacao_publica"}, lighting=425)  # ~1500 pontos/km²
+    prox = service(repo=repo).proximity(-23.55, -46.63, {c: 1 for c in CATEGORIES})
+    info = prox["tipos"]["iluminacao_publica"]
+    assert info["nota"] == 100.0 and info["densidade_km2"] == 1503
+    assert info["distancia_m"] is None and info["pontos_no_raio"] == 425
+    assert info["medida"] == "densidade de pontos de iluminação no entorno"
+
+
+def test_dark_neighbourhood_scores_zero_with_a_message():
+    repo = FakeRepository(available={"iluminacao_publica"}, lighting=0)
+    prox = service(repo=repo).proximity(-23.55, -46.63, {c: 1 for c in CATEGORIES})
+    info = prox["tipos"]["iluminacao_publica"]
+    assert info["nota"] == 0.0 and "nenhum ponto de iluminação" in info["aviso"]
+
+
+def test_lighting_without_source_data_stays_out_of_the_index():
+    prox = service(repo=FakeRepository(lighting=425)).proximity(
+        -23.55, -46.63, {c: 1 for c in CATEGORIES})
+    info = prox["tipos"]["iluminacao_publica"]
+    assert info["nota"] is None and info["aviso"] == "camada indisponível na fonte de dados no momento; o tipo fica fora do cálculo"
+    assert "conectividade" not in prox["categorias_no_indice"]
+
+
+def test_lighting_participates_of_the_connectivity_category_and_the_ipl():
+    repo = FakeRepository(available={"ponto_onibus", "wifi_publico", "iluminacao_publica"},
+                          nearest=[NearbyEquipment("ponto_onibus", "Ponto", 200)],
+                          lighting=141)
+    prox = service(repo=repo).proximity(-23.55, -46.63, {c: 1 for c in CATEGORIES})
+    nota_ilum = lighting_note(lighting_density(141))
+    assert prox["tipos"]["iluminacao_publica"]["nota"] == pytest.approx(round(nota_ilum, 1))
+    assert prox["categorias"]["conectividade"]["nota"] == pytest.approx(round(nota_ilum, 1) / 2)  # wi-fi sem ponto
+    assert prox["categorias_no_indice"] == ["mobilidade", "conectividade"]
+    conectividade = prox["categorias"]["conectividade"]["nota"]
+    assert prox["ipl"] == round((100.0 + conectividade) / 2, 1)
