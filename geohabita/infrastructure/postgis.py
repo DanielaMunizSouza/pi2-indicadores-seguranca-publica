@@ -59,30 +59,32 @@ class PostgisDiagnosisRepository:
         # Os 10 candidatos mais próximos pelo índice (distância em graus) são reordenados
         # pela distância geodésica, que é a que vale (RN12).
         rows = self._rows(f"""
-            SELECT t.tipo, n.nome, n.distancia, ST_Y(n.perto), ST_X(n.perto)
+            SELECT t.tipo, n.nome, n.distancia, ST_Y(n.perto), ST_X(n.perto), n.detalhes
             FROM unnest(%(tipos)s::text[]) AS t(tipo)
             CROSS JOIN LATERAL (
                 SELECT c.nome, ST_Distance(c.geometria::geography, {PONTO}::geography) AS distancia,
-                       ST_ClosestPoint(c.geometria, {PONTO}) AS perto
-                FROM (SELECT nome, geometria FROM public.equipamento_publico e
+                       ST_ClosestPoint(c.geometria, {PONTO}) AS perto, c.detalhes
+                FROM (SELECT nome, geometria, detalhes FROM public.equipamento_publico e
                       WHERE e.tipo = t.tipo AND e.{SEM_ILUMINACAO}
                       ORDER BY e.geometria <-> {PONTO} LIMIT 10) c
                 ORDER BY distancia LIMIT 1) n""",
                           {"tipos": list(types), "lat": latitude, "lon": longitude})
-        return [NearbyEquipment(tipo, nome or "sem nome", float(d), lat, lon) for tipo, nome, d, lat, lon in rows]
+        return [NearbyEquipment(tipo, nome or "sem nome", float(d), lat, lon, det)
+                for tipo, nome, d, lat, lon, det in rows]
 
     def equipment_within(self, latitude: float, longitude: float, radius_m: float,
                          types: Sequence[str]) -> list[NearbyEquipment]:
         rows = self._rows(f"""
             SELECT tipo, nome, ST_Distance(geometria::geography, {PONTO}::geography),
-                   ST_Y(ST_ClosestPoint(geometria, {PONTO})), ST_X(ST_ClosestPoint(geometria, {PONTO}))
+                   ST_Y(ST_ClosestPoint(geometria, {PONTO})), ST_X(ST_ClosestPoint(geometria, {PONTO})), detalhes
             FROM public.equipamento_publico
             WHERE tipo = ANY(%(tipos)s) AND {SEM_ILUMINACAO}
               AND geometria && ST_Expand({PONTO}, %(folga)s)
               AND ST_DWithin(geometria::geography, {PONTO}::geography, %(raio)s)""",
                           {"tipos": list(types), "lat": latitude, "lon": longitude, "raio": radius_m,
                            "folga": radius_m * GRAUS_POR_METRO * 1.5})
-        return [NearbyEquipment(tipo, nome or "sem nome", float(d), lat, lon) for tipo, nome, d, lat, lon in rows]
+        return [NearbyEquipment(tipo, nome or "sem nome", float(d), lat, lon, det)
+                for tipo, nome, d, lat, lon, det in rows]
 
     def lighting_within(self, latitude: float, longitude: float, radius_m: int) -> int:
         """Pontos de iluminação pública a até ``radius_m`` metros do endereço."""

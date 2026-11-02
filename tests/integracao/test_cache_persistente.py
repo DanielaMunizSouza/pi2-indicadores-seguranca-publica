@@ -1,6 +1,5 @@
 """Cache persistente no PostgreSQL (RN04): sobrevive a uma nova instância da aplicação."""
 
-import os
 import uuid
 from dataclasses import asdict
 from datetime import datetime
@@ -9,16 +8,8 @@ import pytest
 
 from geohabita.application.cep_lookup import Address
 from geohabita.infrastructure.cache import PersistentCache
-from geohabita.infrastructure.database import connector
 
 pytestmark = pytest.mark.integracao
-
-
-@pytest.fixture
-def connect():
-    if not os.getenv("DATABASE_URL"):
-        pytest.skip("DATABASE_URL não definido")
-    return connector(os.environ["DATABASE_URL"])
 
 
 def test_entry_is_read_back_by_a_new_cache(connect):

@@ -13,6 +13,9 @@ O administrador altera esses números num arquivo TOML, sem tocar no código
 
     [densidade]
     iluminacao_publica = { raio_m = 300, zero = 150, cem = 1500 }
+
+    [acesso_restrito]
+    parque_conservacao = { fator = 0.3 }
 """
 
 from __future__ import annotations
@@ -38,6 +41,19 @@ class DensityThreshold:
     radius_m: int
     zero_per_km2: float
     full_per_km2: float
+
+
+@dataclass(frozen=True)
+class RestrictedAccess:
+    """Variante de acesso restrito de um tipo: conta para ele, com peso reduzido.
+
+    A nota de um equipamento de acesso restrito é multiplicada por ``factor``
+    (de 0 a 1) e, no IVEP, cada um conta como ``factor`` equipamento do tipo.
+    """
+
+    base_type: str
+    factor: float
+    label: str
 
 
 class ThresholdConfigError(ValueError):
@@ -105,6 +121,14 @@ EQUIPMENT_THRESHOLDS: dict[str, DistanceThreshold] = {
     "wifi_publico": DistanceThreshold(400, 1200),
 }
 
+# Parques de conservação e parques naturais do Plano Diretor priorizam a proteção
+# ambiental, com visitação restrita ou controlada: somam como área verde, mas com
+# peso baixo, para não darem nota alta a um endereço sem parque aberto por perto.
+RESTRICTED_TYPES: dict[str, RestrictedAccess] = {
+    "parque_conservacao": RestrictedAccess("parque_area_verde", 0.3,
+                                           "parque de conservação ou natural, de acesso restrito"),
+}
+
 # Limiares dos tipos medidos por densidade (nota da iluminação pública).
 DENSITY_THRESHOLDS: dict[str, DensityThreshold] = {
     LIGHTING_TYPE: DensityThreshold(PADRAO_RAIO_M, PADRAO_ZERO, PADRAO_CEM),
@@ -113,7 +137,7 @@ DENSITY_THRESHOLDS: dict[str, DensityThreshold] = {
 ARQUIVO_PADRAO = Path("config/limiares.toml")
 
 
-def _aplicar(distancia: dict, densidade: dict, origem: str) -> None:
+def _aplicar(distancia: dict, densidade: dict, origem: str, restrito: dict | None = None) -> None:
     if not isinstance(distancia, dict):
         raise ThresholdConfigError(f"a tabela [distancia] de {origem} é obrigatória.")
     for tipo, valores in distancia.items():
@@ -135,6 +159,14 @@ def _aplicar(distancia: dict, densidade: dict, origem: str) -> None:
                 and float(zero) < float(cem)):
             raise ThresholdConfigError(f"{origem}: {tipo} exige raio_m > 0 e zero < cem.")
         DENSITY_THRESHOLDS[tipo] = DensityThreshold(raio, float(zero), float(cem))
+    for tipo, valores in (restrito or {}).items():
+        if tipo not in RESTRICTED_TYPES:
+            raise ThresholdConfigError(f"{origem}: {tipo} não é um tipo de acesso restrito.")
+        fator = valores.get("fator") if isinstance(valores, dict) else None
+        if not (isinstance(fator, (int, float)) and not isinstance(fator, bool) and 0 <= fator <= 1):
+            raise ThresholdConfigError(f"{origem}: {tipo} exige fator entre 0 e 1.")
+        atual = RESTRICTED_TYPES[tipo]
+        RESTRICTED_TYPES[tipo] = RestrictedAccess(atual.base_type, float(fator), atual.label)
 
 
 def load_thresholds(path: Path | str | None = None) -> Path | None:
@@ -153,6 +185,7 @@ def load_thresholds(path: Path | str | None = None) -> Path | None:
             conteudo = tomllib.load(entrada)
         except tomllib.TOMLDecodeError as exc:
             raise ThresholdConfigError(f"{arquivo.name}: {exc}") from exc
-    _aplicar(conteudo.get("distancia", {}), conteudo.get("densidade", {}), arquivo.name)
+    _aplicar(conteudo.get("distancia", {}), conteudo.get("densidade", {}), arquivo.name,
+             conteudo.get("acesso_restrito", {}))
     return arquivo
 

@@ -53,10 +53,10 @@ DOWNLOADS_GEOSAMPA = 4  # requisições simultâneas ao WFS da Prefeitura
 
 # camada GeoSampa -> (categoria do IVEP, tipo de equipamento). Categorias e tipos seguem
 # geohabita/domain/thresholds.py. Fora da lista: "praca" (a camada GEOSAMPA_v_praca_largo falha
-# no servidor do GeoSampa por erro de certificado; tente de novo mais tarde).
+# no servidor do GeoSampa por erro de certificado; tente de novo mais tarde) e
+# "GEOSAMPA_cadparcs_parque_unidade_conservacao" (não existe mais no WFS).
 CAMADAS = {
     "pde_parque_municipal": ("lazer_convivencia", "parque_area_verde"),
-    "GEOSAMPA_cadparcs_parque_unidade_conservacao": ("lazer_convivencia", "parque_area_verde"),
     "equipamento_cultura_bibliotecas": ("cultura_esporte", "biblioteca_centro_cultural"),
     "equipamento_cultura_espacos_culturais": ("cultura_esporte", "biblioteca_centro_cultural"),
     "equipamento_educacao_ceu": ("cultura_esporte", "ceu_equipamento_esportivo"),
@@ -184,27 +184,81 @@ def cep_limpo(valor):
 
 
 SQL_EQUIPAMENTO = (
-    "INSERT INTO public.equipamento_publico (categoria,tipo,camada,identificador,nome,endereco,cep,geometria) "
-    "VALUES (%s,%s,%s,%s,%s,%s,%s,ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326))) "
+    "INSERT INTO public.equipamento_publico (categoria,tipo,camada,identificador,nome,endereco,cep,geometria,detalhes) "
+    "VALUES (%s,%s,%s,%s,%s,%s,%s,ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326)),%s::jsonb) "
     "ON CONFLICT (camada,identificador) DO UPDATE SET categoria=EXCLUDED.categoria,tipo=EXCLUDED.tipo,"
-    "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,importado_em=now()")
+    "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,"
+    "detalhes=EXCLUDED.detalhes,importado_em=now()")
+
+
+def existe(camada, props) -> bool:
+    """A feição representa um equipamento que existe hoje.
+
+    A camada de parques do Plano Diretor mistura parques existentes e propostos
+    (``tx_tipo_situacao_projeto``); um parque proposto ainda não existe e não pode
+    contar na proximidade nem na vitalidade.
+    """
+    if camada == "pde_parque_municipal":
+        return props.get("tx_tipo_situacao_projeto") == "Existente"
+    return True
+
+
+# Categorias do Plano Diretor cujo foco é a proteção ambiental, com visitação restrita
+# ou controlada: viram "parque_conservacao", que conta com peso reduzido (thresholds.py).
+PARQUES_RESTRITOS = {"Parque de Conservação", "Parque Natural"}
+
+
+def tipo_da_feicao(camada, tipo, props) -> str:
+    """Tipo de equipamento da feição; separa os parques de acesso restrito."""
+    if camada == "pde_parque_municipal" and \
+            props.get("tx_tipo_categoria_parque_unidade_conservacao") in PARQUES_RESTRITOS:
+        return "parque_conservacao"
+    return tipo
+
+
+DIAS = {"SEGUNDA-FEIRA": "segunda-feira", "TERCA-FEIRA": "terça-feira", "QUARTA-FEIRA": "quarta-feira",
+        "QUINTA-FEIRA": "quinta-feira", "SEXTA-FEIRA": "sexta-feira", "SABADO": "sábado", "DOMINGO": "domingo"}
+
+
+def _texto(valor):
+    """Texto da fonte sem espaços repetidos (inclusive não separáveis) nem ponto final."""
+    texto = " ".join(str(valor or "").replace("\xa0", " ").split()).rstrip(".").strip()
+    return None if not texto or texto.upper() in ("NÃO INFORMADO", "NAO INFORMADO", "NONE") else texto
+
+
+def detalhes_da_feicao(camada, props) -> dict | None:
+    """Dia da feira livre; horário e telefone do mercado municipal (quando a fonte traz)."""
+    if camada == "equipamento_feira_livre":
+        dia = _texto(props.get("tx_dia_funcionamento"))
+        return {"dia": DIAS.get(dia.upper(), dia.lower())} if dia else None
+    if camada == "equipamento_mercados_municipais":
+        horario = _texto(props.get("tx_horario_funcionamento"))
+        detalhes = {"horario": horario.capitalize() if horario else None,
+                    "telefone": _texto(props.get("tx_numero_telefone"))}
+        return {k: v for k, v in detalhes.items() if v} or None
+    return None
 
 
 def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
-    """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10)."""
+    """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10).
+
+    Linhas da camada que já estavam no banco e não vieram nesta carga (removidas
+    da fonte ou descartadas pelo filtro) são apagadas.
+    """
     feicoes = json.loads(arquivo.read_text(encoding="utf-8"))["features"]
     linhas = []
     for i, f in enumerate(feicoes):
-        if not f.get("geometry"):
+        if not f.get("geometry") or not existe(camada, f["properties"]):
             continue
         p = f["properties"]
         ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia",
                          "cd_identificador_iluminacao_publica", "cd_equipamento") or f.get("id") or str(i)
-        linhas.append((categoria, tipo, camada, ident,
+        linhas.append((categoria, tipo_da_feicao(camada, tipo, p), camada, ident,
                        primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem",
                                 "nm_trecho_via_bicicleta", "cd_placa", "nm_parque", "nm_terminal_onibus"),
                        primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus", "tx_endereco"),
-                       cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"])))
+                       cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"]),
+                       json.dumps(detalhes_da_feicao(camada, p), ensure_ascii=False)))
     chave = f"eq:{camada}"
     progresso.inicio(chave, f"carregando {camada}", total=len(linhas), silencioso=len(linhas) <= LOTE)
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
@@ -212,7 +266,9 @@ def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
             with conn.transaction(), conn.cursor() as cur:
                 cur.executemany(SQL_EQUIPAMENTO, linhas[i:i + LOTE])
             progresso.avanco(chave, feito=min(i + LOTE, len(linhas)))
-    conservados = len(linhas)  # linhas sem geometria já ficaram fora, acima
+        conn.execute("DELETE FROM public.equipamento_publico WHERE camada = %s AND NOT (identificador = ANY(%s))",
+                     (camada, [linha[3] for linha in linhas]))
+    conservados = len(linhas)  # linhas sem geometria ou que não existem já ficaram fora, acima
     progresso.fim(chave, f"{camada}: {len(linhas):,} equipamentos")
     return conservados
 

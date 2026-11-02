@@ -11,7 +11,7 @@
 .search label, .comp-busca label {
   display: block;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin-bottom: 5px;
 }
 
@@ -21,7 +21,7 @@
   border: 1px solid #8ebdb7;
   border-radius: 9px;
   padding: 8px 12px;
-  font-size: 18px;
+  font-size: 1.125rem;
   letter-spacing: .04em;
   font-variant-numeric: tabular-nums;
   background: #f7fbfa;
@@ -50,7 +50,7 @@
   background: #f7fbfa;
   color: var(--ink);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
   cursor: pointer;
   padding: 9px 12px;
 }
@@ -65,7 +65,7 @@
   border-radius: 9px;
   background: #f2f6f7;
   color: #3d5864;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .status.erro {
@@ -83,7 +83,7 @@
 
 .place h2 {
   margin: 0;
-  font-size: 21px;
+  font-size: 1.3125rem;
 }
 
 .place .district {
@@ -123,7 +123,7 @@
 }
 
 .comp-tabela thead th.comp-indicador {
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: .04em;
   width: 32%;
@@ -138,13 +138,13 @@
 }
 
 .comp-titulo {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--ink);
 }
 
 .comp-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--muted);
   margin: 2px 0 6px;
@@ -160,7 +160,7 @@
 }
 
 .comp-tabela tbody td {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -172,7 +172,7 @@
 .comp-tabela tr.comp-grupo th {
   background: #f2f6f7;
   color: #405963;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -182,7 +182,7 @@
 .comp-notas {
   margin: 8px 0 0;
   padding-left: 18px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
@@ -206,7 +206,7 @@
   background: none;
   padding: 11px 14px;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--muted);
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
@@ -259,7 +259,7 @@ abbr {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .filters label {
@@ -276,18 +276,18 @@ abbr {
 }
 
 .score strong {
-  font-size: 44px;
+  font-size: 2.75rem;
   letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .score span {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .compare {
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--muted);
   margin: 2px 0 10px;
 }
@@ -301,7 +301,7 @@ abbr {
 .weights label {
   display: grid;
   gap: 4px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
@@ -344,12 +344,12 @@ abbr {
 }
 
 .trend {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .tag {
   display: inline-block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 1px 7px;
   border-radius: 999px;
   background: #eef3f5;
@@ -357,10 +357,10 @@ abbr {
 }
 
 .method {
-  max-width: 1400px;
+  max-width: var(--largura-max);
   margin: 18px auto 28px;
   padding: 0 20px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: #3f5966;
 }
 
@@ -430,12 +430,12 @@ abbr {
   }
 
   .score strong {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
 
   [role=tab] {
     padding: 9px;
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .top-nav {
@@ -445,4 +445,43 @@ abbr {
   .a11y-bar {
     padding: 0 10px;
   }
+}
+
+/* O que conta em cada categoria: detalhes sob a barra, na largura toda. */
+.bar .detalhe-categoria {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+}
+
+.detalhe-categoria summary {
+  cursor: pointer;
+  color: var(--teal-dark);
+  font-weight: 700;
+  width: fit-content;
+  min-height: 24px;
+}
+
+.detalhe-categoria ul, .detalhe-categoria ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.detalhe-categoria li {
+  margin: 3px 0;
+}
+
+.detalhe-categoria .hint {
+  margin: 6px 0 0;
+}
+
+/* Funcionamento (dia da feira, horário do mercado) no mapa e nas tabelas. */
+.popup-detalhes {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.detalhe-funcionamento {
+  font-weight: 400;
+  font-size: 0.8125rem;
 }

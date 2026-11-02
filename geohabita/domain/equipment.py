@@ -29,6 +29,7 @@ EQUIPMENT_CATEGORY: dict[str, str] = {
     "escola_publica": "servicos_essenciais",
     "wifi_publico": "conectividade",
     LIGHTING_TYPE: "conectividade",
+    "parque_conservacao": "lazer_convivencia",  # variante restrita de parque_area_verde
 }
 
 
@@ -48,6 +49,7 @@ class NearbyEquipment:
     distance_m: float
     latitude: float | None = None  # ponto do equipamento (ou do contorno mais próximo), para o mapa
     longitude: float | None = None
+    details: dict | None = None  # funcionamento vindo da fonte (dia da feira, horário do mercado)
 
 
 def nearest_by_type(items: Iterable[NearbyEquipment]) -> dict[str, NearbyEquipment]:
@@ -82,3 +84,9 @@ def missing_type_message(max_m: int) -> str:
 def missing_lighting_message(radius_m: int) -> str:
     """Mensagem para entorno sem nenhum ponto de iluminação cadastrado (RN15)."""
     return f"nenhum ponto de iluminação pública a menos de {radius_m} metros"
+
+
+def restricted_access_message(label: str, factor: float) -> str:
+    """Aviso de que o equipamento mais vantajoso é de acesso restrito e vale menos."""
+    return (f"o mais próximo é {label}; conta com {round(factor * 100)}% da nota de um "
+            "equipamento aberto ao público")

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>GeoHabita</title>
+  <rect width="32" height="32" rx="7" fill="#103746"/>
+  <g transform="translate(4 4)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3 20 6v5c0 5.2-3.4 8.5-8 10-4.6-1.5-8-4.8-8-10V6l8-3Z"/>
+    <path d="M7 14h3l2-5 2 7 1.5-3H18"/>
+  </g>
+</svg>

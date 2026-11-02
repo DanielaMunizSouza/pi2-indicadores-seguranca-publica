@@ -16,6 +16,7 @@ const CATEGORIAS = {
 const TIPOS = {
   praca: 'Praça',
   parque_area_verde: 'Parque ou área verde',
+  parque_conservacao: 'Parque de conservação (acesso restrito)',
   biblioteca_centro_cultural: 'Biblioteca ou centro cultural',
   ceu_equipamento_esportivo: 'CEU ou equipamento esportivo',
   ponto_onibus: 'Ponto de ônibus',
@@ -172,9 +173,9 @@ async function desenharMapa(d) {
       const marcador = L.circleMarker([item.latitude, item.longitude], {
         radius: 6, color: '#fff', weight: 1.5, fillColor: cor(categoria), fillOpacity: .95,
       });
-      marcador.bindPopup(el('div', {},
-        el('div', { class: 'popup-title', text: item.nome }),
-        el('div', { text: `${TIPOS[item.tipo]} · ${distancia(item.distancia_m)} em linha reta` })));
+      // A dica aparece ao passar o mouse; o clique abre a mesma informação fixa.
+      marcador.bindTooltip(conteudoDoPonto(item), { direction: 'top', offset: [0, -6] });
+      marcador.bindPopup(conteudoDoPonto(item));
       marcador.addTo(camadas.categorias[categoria]);
     }
   }
@@ -210,13 +211,87 @@ function linhaVazia(tbody, colunas, texto) {
   tbody.replaceChildren(el('tr', {}, el('td', { colSpan: colunas, text: texto })));
 }
 
+// ---------- funcionamento vindo da fonte (dia da feira, horário do mercado) ----------
+function textoDetalhes(detalhes) {
+  if (!detalhes) return '';
+  const partes = [];
+  if (detalhes.dia) partes.push(`Funciona: ${detalhes.dia}`);
+  if (detalhes.horario) partes.push(`Horário: ${detalhes.horario}`);
+  if (detalhes.telefone) partes.push(`Telefone: ${detalhes.telefone}`);
+  return partes.join(' · ');
+}
+
+/** Conteúdo do ponto no mapa (dica ao passar o mouse e janela ao clicar). */
+function conteudoDoPonto(item) {
+  const detalhes = textoDetalhes(item.detalhes);
+  return el('div', {},
+    el('div', { class: 'popup-title', text: item.nome }),
+    el('div', { text: `${TIPOS[item.tipo]} · ${distancia(item.distancia_m)} em linha reta` }),
+    detalhes ? el('div', { class: 'popup-detalhes', text: detalhes }) : null);
+}
+
+// ---------- o que conta em cada categoria (detalhes sob as barras) ----------
+const MAIS_PROXIMOS = 5;
+
+/** <details> sob a barra da categoria, com uma linha por tipo de equipamento. */
+function detalhesDaCategoria(rotulo, linhas, extra = null) {
+  return el('details', { class: 'detalhe-categoria' },
+    el('summary', { text: `O que conta em ${rotulo}` }),
+    el('ul', {}, ...linhas),
+    extra);
+}
+
+function linhaDeTipo(tipo, texto, disponivel = true, aviso = null) {
+  return el('li', disponivel ? {} : { class: 'muted' },
+    el('strong', { text: `${TIPOS[tipo]}: ` }),
+    disponivel ? texto : `sem dados na fonte (${aviso || 'camada indisponível'}).`);
+}
+
+function textoProximidade(info) {
+  if (info.pontos_no_raio != null) {
+    return `nota ${num.format(info.nota)} · ${int.format(info.pontos_no_raio)} pontos a até `
+      + `${int.format(info.raio_medida_m)} m (${int.format(info.densidade_km2)}/km²).`;
+  }
+  const nota = `nota ${num.format(info.nota)}`;
+  if (info.acesso_restrito) {
+    return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta: ${info.aviso}.`;
+  }
+  if (info.distancia_m == null || info.aviso) return `${nota} · ${info.aviso}.`;
+  return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta `
+    + `(${info.tempo_caminhada_min} min a pé)${info.detalhes ? `. ${textoDetalhes(info.detalhes)}` : ''}.`;
+}
+
+function textoVitalidade(info) {
+  const partes = [`${int.format(info.equipamentos)} no distrito`];
+  if (info.densidade_km2 != null) partes.push(`${num.format(info.densidade_km2)}/km²`);
+  if (info.densidade_10k_hab != null) partes.push(`${num.format(info.densidade_10k_hab)} por 10 mil moradores`);
+  partes.push(`posição ${num.format(info.percentil)} de 100`);
+  return `${partes.join(' · ')}.`;
+}
+
 function renderProximidade(p) {
   $('ipl').textContent = p.ipl == null ? '—' : num.format(p.ipl);
   const ul = $('ipl-categorias');
   ul.replaceChildren();
   for (const [categoria, info] of Object.entries(p.categorias)) {
-    const item = barra(CATEGORIAS[categoria][0], info.nota, { corDaBarra: cor(categoria) });
+    const rotulo = CATEGORIAS[categoria][0];
+    const item = barra(rotulo, info.nota, { corDaBarra: cor(categoria) });
     if (info.nota == null) item.querySelector('.value').title = 'sem dados na fonte';
+    const tipos = Object.entries(p.tipos).filter(([, t]) => t.categoria === categoria);
+    const proximos = (p.entorno[categoria] || []).slice(0, MAIS_PROXIMOS);
+    const extra = proximos.length
+      ? el('div', {},
+        el('p', { class: 'hint', text: (p.entorno[categoria] || []).length > MAIS_PROXIMOS
+          ? `Os ${MAIS_PROXIMOS} mais próximos dos ${p.entorno[categoria].length} a até 1 km (todos na aba Ver como tabela):`
+          : 'Todos a até 1 km:' }),
+        el('ol', {}, ...proximos.map((e) => el('li', {
+          text: `${e.nome || TIPOS[e.tipo]} (${TIPOS[e.tipo]}), ${distancia(e.distancia_m)}`
+            + `${e.detalhes ? ` · ${textoDetalhes(e.detalhes)}` : ''}`,
+        }))))
+      : el('p', { class: 'hint', text: 'Nenhum equipamento desta categoria a até 1 km.' });
+    item.append(detalhesDaCategoria(rotulo,
+      tipos.map(([tipo, t]) => linhaDeTipo(tipo, t.disponivel ? textoProximidade(t) : '', t.disponivel, t.aviso)),
+      extra));
     ul.append(item);
   }
   const tabela = $('tipos');
@@ -229,7 +304,8 @@ function renderProximidade(p) {
       : el('span', { class: 'muted', text: 'sem dados na fonte' });
     tabela.append(el('tr', {},
       el('th', { scope: 'row', text: TIPOS[tipo] }),
-      el('td', {}, nome, info.aviso && info.disponivel ? el('div', { class: 'muted', text: info.aviso }) : null),
+      el('td', {}, nome, info.aviso && info.disponivel ? el('div', { class: 'muted', text: info.aviso }) : null,
+        info.detalhes ? el('div', { class: 'muted detalhe-funcionamento', text: textoDetalhes(info.detalhes) }) : null),
       el('td', { class: 'num', text: info.pontos_no_raio != null ? '—' : distancia(info.distancia_m) }),
       el('td', { class: 'num', text: info.tempo_caminhada_min == null ? '—' : `${info.tempo_caminhada_min} min` }),
       el('td', { class: 'num', text: info.nota == null ? '—' : num.format(info.nota) }),
@@ -248,14 +324,15 @@ function renderProximidade(p) {
     tabelaEntorno.append(el('tr', {},
       el('td', { text: CATEGORIAS[categoria][0] }),
       el('td', { text: TIPOS[item.tipo] }),
-      el('th', { scope: 'row', text: item.nome }),
+      el('th', { scope: 'row' }, item.nome,
+        item.detalhes ? el('div', { class: 'muted detalhe-funcionamento', text: textoDetalhes(item.detalhes) }) : null),
       el('td', { class: 'num', text: distancia(item.distancia_m) }),
       el('td', { class: 'num', text: minutos(item.distancia_m) })));
   }
 }
 
 function renderVitalidade(v) {
-  $('ivep').textContent = num.format(v.ivep);
+  $('ivep').textContent = v.ivep == null ? '—' : num.format(v.ivep);
   $('ivep-mediana').textContent = v.mediana_municipal == null ? ''
     : `Mediana dos 96 distritos com os mesmos pesos: ${num.format(v.mediana_municipal)}.`;
   const ul = $('ivep-categorias');
@@ -263,7 +340,15 @@ function renderVitalidade(v) {
   const tabela = $('vitalidade');
   tabela.replaceChildren();
   for (const [categoria, info] of Object.entries(v.categorias)) {
-    ul.append(barra(CATEGORIAS[categoria][0], info.percentil, { corDaBarra: cor(categoria), mediana: 50 }));
+    const rotulo = CATEGORIAS[categoria][0];
+    const item = barra(rotulo, info.percentil, { corDaBarra: cor(categoria), mediana: 50 });
+    const tipos = Object.entries(info.tipos || {});
+    if (tipos.length) {
+      item.append(detalhesDaCategoria(rotulo,
+        tipos.map(([tipo, t]) => linhaDeTipo(tipo, t.disponivel ? textoVitalidade(t) : '', t.disponivel, t.aviso)),
+        el('p', { class: 'hint', text: 'A posição da categoria é a média das posições dos tipos com dados.' })));
+    }
+    ul.append(item);
     tabela.append(el('tr', {},
       el('th', { scope: 'row', text: CATEGORIAS[categoria][0] }),
       el('td', { class: 'num', text: info.equipamentos == null ? '—' : int.format(info.equipamentos) }),
@@ -379,7 +464,7 @@ function linhasCsv(resposta) {
         `${item.nome} · ${minutos(item.distancia_m)} a pé`]);
     }
   }
-  linhas.push(['vitalidade', 'IVEP', d.vitalidade.ivep, 'de 100', 'distrito', '']);
+  linhas.push(['vitalidade', 'IVEP', d.vitalidade.ivep ?? '', 'de 100', 'distrito', '']);
   for (const [categoria, info] of Object.entries(d.vitalidade.categorias)) {
     linhas.push(['vitalidade', 'categoria', categoria, info.percentil ?? '', 'percentil',
       `${info.equipamentos ?? 0} equipamentos · ${info.densidade_km2 ?? ''}/km²`
@@ -635,7 +720,7 @@ async function diagnosticar(alvo, soPesos = false) {
     const d = resposta.diagnostico;
     anunciar(`${soPesos ? 'Índices recalculados' : 'Diagnóstico concluído'} para o distrito ${state.distrito.nome}: `
       + `proximidade ${d.proximidade.ipl == null ? 'sem dados' : num.format(d.proximidade.ipl)}, `
-      + `vitalidade ${num.format(d.vitalidade.ivep)}, de 100.`);
+      + `vitalidade ${d.vitalidade.ivep == null ? 'sem dados' : num.format(d.vitalidade.ivep)}, de 100.`);
     if (!soPesos) {
       $('local-titulo').focus();
       if (alvo.cep) atualizarUrl({ cep: alvo.cep, numero: alvo.numero || '' });

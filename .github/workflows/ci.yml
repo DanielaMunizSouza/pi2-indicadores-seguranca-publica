@@ -56,8 +56,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
       - run: uv sync --frozen
-      - name: Aplicar o esquema
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
+      # Os testes criam um banco geohabita_teste_* no serviço, com o esquema e dados fictícios.
       - run: uv run pytest -m integracao
 
   e2e-acessibilidade:

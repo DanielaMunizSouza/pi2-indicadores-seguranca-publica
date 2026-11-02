@@ -26,6 +26,7 @@ from geohabita.domain.equipment import (
     NearbyEquipment,
     missing_lighting_message,
     missing_type_message,
+    restricted_access_message,
     within_radius,
 )
 from geohabita.domain.lighting import LIGHTING_TYPE, lighting_density, lighting_note, lighting_thresholds
@@ -54,6 +55,7 @@ from geohabita.domain.thresholds import (
     DENSITY_TYPES,
     EQUIPMENT_THRESHOLDS,
     EQUIPMENT_TYPES,
+    RESTRICTED_TYPES,
 )
 from geohabita.domain.vitality import DEFAULT_WEIGHT, is_valid_weight, public_space_vitality_index
 
@@ -194,9 +196,12 @@ class DiagnosisService:
 
     # --- bloco 1: proximidade (RF07, RF23, RF24) -----------------------------
     def proximity(self, latitude: float, longitude: float, pesos: Mapping[str, int]) -> dict[str, Any]:
-        available = self.repository.available_types() & set(EQUIPMENT_TYPES)
+        carregados = self.repository.available_types()
+        restritos = {t: r for t, r in RESTRICTED_TYPES.items() if t in carregados}
+        # Um tipo com só a variante restrita carregada também está disponível.
+        available = (carregados & set(EQUIPMENT_TYPES)) | {r.base_type for r in restritos.values()}
         # Os tipos medidos por distância são os que o banco consulta por vizinho mais próximo.
-        por_distancia = sorted(available - DENSITY_TYPES)
+        por_distancia = sorted((available - DENSITY_TYPES) | set(restritos))
         nearest = {e.type: e for e in self.repository.nearest_by_type(latitude, longitude, por_distancia)}
         raio_ilum, _, _ = lighting_thresholds()
         iluminacao = self.repository.lighting_within(latitude, longitude, raio_ilum)
@@ -235,16 +240,31 @@ class DiagnosisService:
             distancia = round(mais_proximo.distance_m, 1) if mais_proximo else None
             nota = proximity_note(distancia, limiar.ideal_m, limiar.max_m)
             fora = distancia is None or distancia >= limiar.max_m
+            aviso = missing_type_message(limiar.max_m) if fora else None
+            # Variante de acesso restrito (parque de conservação): vale a nota reduzida
+            # pelo fator, e só substitui o aberto quando dá nota maior que ele.
+            restrito = None
+            for nome_r, r in restritos.items():
+                candidato = nearest.get(nome_r) if r.base_type == tipo else None
+                if candidato is None:
+                    continue
+                d_r = round(candidato.distance_m, 1)
+                nota_r = r.factor * proximity_note(d_r, limiar.ideal_m, limiar.max_m)
+                if nota_r > nota:
+                    mais_proximo, distancia, nota, restrito = candidato, d_r, nota_r, r
+                    aviso = restricted_access_message(r.label, r.factor)
             tipos[tipo] = info | {
+                "acesso_restrito": restrito is not None,
                 "nota": round(nota, 1),
                 "distancia_m": distancia,
                 "nome": mais_proximo.name if mais_proximo else None,
                 "latitude": mais_proximo.latitude if mais_proximo else None,
                 "longitude": mais_proximo.longitude if mais_proximo else None,
+                "detalhes": mais_proximo.details if mais_proximo else None,
                 "tempo_caminhada_min": walking_time_minutes(distancia) if distancia is not None else None,
                 "ate_500m": sum(1 for e in around if e.type == tipo and e.distance_m <= 500),
                 "ate_1km": sum(1 for e in around if e.type == tipo and e.distance_m <= 1000),
-                "aviso": missing_type_message(limiar.max_m) if fora else None,
+                "aviso": aviso,
             }
         categorias: dict[str, dict[str, Any]] = {}
         notas, pesos_ipl = [], []
@@ -262,7 +282,8 @@ class DiagnosisService:
         ipl = local_proximity_index(notas, pesos_ipl) if sum(pesos_ipl) else None
         entorno = {
             categoria: [{"tipo": e.type, "nome": e.name, "distancia_m": round(e.distance_m, 1),
-                         "latitude": e.latitude, "longitude": e.longitude} for e in itens]
+                         "latitude": e.latitude, "longitude": e.longitude, "detalhes": e.details}
+                        for e in itens]
             for categoria, itens in within_radius(around, max(LISTING_RADII_M)).items()
         }
         return {"ipl": round(ipl, 1) if ipl is not None else None, "medida": STRAIGHT_LINE_LABEL,
@@ -271,20 +292,37 @@ class DiagnosisService:
     # --- bloco 2: vitalidade (RF08, RF09) -------------------------------------
     def vitality(self, code: str, indicators: Mapping[str, Mapping[tuple[str, str, int], float]],
                  pesos: Mapping[str, int]) -> dict[str, Any]:
-        lista_pesos = [pesos[c] for c in CATEGORIES]
-
-        def ivep(dados: Mapping[tuple[str, str, int], float]) -> float:
-            return public_space_vitality_index([dados.get(("percentil", c, 0), 0.0) for c in CATEGORIES],
-                                               lista_pesos)
+        def ivep(dados: Mapping[tuple[str, str, int], float]) -> float | None:
+            # Categoria sem percentil não tem nenhum tipo na fonte: fica fora da média,
+            # como no IPL, em vez de entrar como oferta zero.
+            presentes = [c for c in CATEGORIES if dados.get(("percentil", c, 0)) is not None]
+            if not sum(pesos[c] for c in presentes):
+                return None
+            return public_space_vitality_index([dados[("percentil", c, 0)] for c in presentes],
+                                               [pesos[c] for c in presentes])
 
         dados = indicators.get(code, {})
-        todos = [ivep(d) for d in indicators.values() if any(k[0] == "percentil" for k in d)]
-        categorias = {c: {"percentil": dados.get(("percentil", c, 0)),
-                          "equipamentos": dados.get(("equipamentos", c, 0)),
-                          "densidade_km2": dados.get(("densidade_km2", c, 0)),
-                          "densidade_10k_hab": dados.get(("densidade_10k_hab", c, 0)),
-                          "peso": pesos[c]} for c in CATEGORIES}
-        return {"ivep": round(ivep(dados), 1),
+        todos = [v for d in indicators.values() if (v := ivep(d)) is not None]
+        indice = ivep(dados)
+        def figuras(chave: str) -> dict[str, Any]:
+            return {"percentil": dados.get(("percentil", chave, 0)),
+                    "equipamentos": dados.get(("equipamentos", chave, 0)),
+                    "densidade_km2": dados.get(("densidade_km2", chave, 0)),
+                    "densidade_10k_hab": dados.get(("densidade_10k_hab", chave, 0))}
+
+        def tipo(nome: str) -> dict[str, Any]:
+            # Sem percentil, o tipo não tem dados na fonte e não entra na categoria.
+            info = figuras(nome)
+            disponivel = info["percentil"] is not None
+            return info | {"disponivel": disponivel,
+                           "aviso": None if disponivel else UNAVAILABLE_LAYER_MESSAGE}
+
+        # Os tipos de cada categoria mostram de onde vem a posição dela (média dos tipos).
+        categorias = {c: figuras(c) | {"peso": pesos[c],
+                                       "tipos": {t: tipo(t) for t, cat in EQUIPMENT_TYPES.items() if cat == c}}
+                      for c in CATEGORIES}
+        return {"ivep": round(indice, 1) if indice is not None else None,
+                "categorias_no_indice": [c for c in CATEGORIES if dados.get(("percentil", c, 0)) is not None],
                 "mediana_municipal": round(statistics.median(todos), 1) if todos else None,
                 "categorias": categorias}
 

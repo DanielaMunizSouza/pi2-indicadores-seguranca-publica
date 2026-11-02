@@ -23,8 +23,12 @@ from geohabita.domain.thresholds import (
 
 
 def test_every_type_has_a_known_category():
-    # Todo tipo é medido por distância (quadro de limiares) ou por densidade.
-    assert set(EQUIPMENT_CATEGORY) == set(EQUIPMENT_TYPES)
+    # Todo tipo é medido por distância (quadro de limiares) ou por densidade; as
+    # variantes de acesso restrito pertencem à categoria do seu tipo base.
+    from geohabita.domain.thresholds import RESTRICTED_TYPES
+    assert set(EQUIPMENT_CATEGORY) == set(EQUIPMENT_TYPES) | set(RESTRICTED_TYPES)
+    for tipo, restrito in RESTRICTED_TYPES.items():
+        assert EQUIPMENT_CATEGORY[tipo] == EQUIPMENT_CATEGORY[restrito.base_type]
     assert set(EQUIPMENT_THRESHOLDS) | set(DENSITY_TYPES) == set(EQUIPMENT_TYPES)
     assert set(EQUIPMENT_CATEGORY.values()) <= set(CATEGORIES)
 

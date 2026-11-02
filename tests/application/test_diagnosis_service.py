@@ -19,7 +19,7 @@ from geohabita.domain.equipment import NearbyEquipment
 from geohabita.domain.lighting import lighting_density, lighting_note
 from geohabita.domain.rates import INSUFFICIENT_DATA_MESSAGE
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE
-from geohabita.domain.thresholds import CATEGORIES
+from geohabita.domain.thresholds import CATEGORIES, EQUIPMENT_TYPES
 
 SE = District("01", "SÉ", "Centro")
 CATEGORIAS = list(CATEGORIES)
@@ -162,6 +162,62 @@ def test_type_beyond_the_maximum_distance_gets_zero_and_a_message():
     assert tipo["aviso"] == "nenhum equipamento deste tipo a menos de 2000 metros"
 
 
+COM_CONSERVACAO = {"parque_area_verde", "parque_conservacao", "ponto_onibus"}
+
+
+def parques(aberto=None, conservacao=None):
+    itens = []
+    if aberto is not None:
+        itens.append(NearbyEquipment("parque_area_verde", "Parque Aberto", aberto))
+    if conservacao is not None:
+        itens.append(NearbyEquipment("parque_conservacao", "Parque Conservação", conservacao))
+    return itens
+
+
+def tipo_parque(nearest, available=COM_CONSERVACAO):
+    repo = FakeRepository(available=available, nearest=nearest, within=nearest)
+    return service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]["tipos"]["parque_area_verde"]
+
+
+def test_parque_de_conservacao_ao_lado_vale_pouco():
+    tipo = tipo_parque(parques(conservacao=100.0))  # sem parque aberto até 1,2 km
+    assert tipo["nota"] == pytest.approx(30.0)  # 100 x fator 0,3
+    assert tipo["acesso_restrito"] is True and tipo["nome"] == "Parque Conservação"
+    assert "acesso restrito" in tipo["aviso"] and "30%" in tipo["aviso"]
+
+
+def test_parque_aberto_vence_quando_da_nota_maior():
+    tipo = tipo_parque(parques(aberto=700.0, conservacao=50.0))  # aberto: nota 62,5; restrito: 30
+    assert tipo["nota"] == pytest.approx(62.5)
+    assert tipo["acesso_restrito"] is False and tipo["nome"] == "Parque Aberto"
+    assert tipo["aviso"] is None
+
+
+def test_restrito_so_melhora_a_nota_quando_o_aberto_esta_longe():
+    tipo = tipo_parque(parques(aberto=1150.0, conservacao=200.0))  # aberto: 6,25; restrito: 30
+    assert tipo["nota"] == pytest.approx(30.0) and tipo["acesso_restrito"] is True
+
+
+def test_so_parque_de_conservacao_carregado_ainda_conta():
+    tipo = tipo_parque(parques(conservacao=100.0), available={"parque_conservacao"})
+    assert tipo["disponivel"] is True and tipo["nota"] == pytest.approx(30.0)
+
+
+def test_parque_de_conservacao_aparece_no_entorno_de_lazer():
+    repo = FakeRepository(available=COM_CONSERVACAO, nearest=parques(conservacao=100.0),
+                          within=parques(conservacao=100.0))
+    entorno = service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]["entorno"]
+    assert [e["tipo"] for e in entorno["lazer_convivencia"]] == ["parque_conservacao"]
+
+
+def test_detalhes_de_funcionamento_chegam_ao_tipo_e_ao_entorno():
+    feira = NearbyEquipment("feira_mercado_municipal", "Feira X", 300.0, details={"dia": "domingo"})
+    repo = FakeRepository(available={"feira_mercado_municipal"}, nearest=[feira], within=[feira])
+    bloco = service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
+    assert bloco["tipos"]["feira_mercado_municipal"]["detalhes"] == {"dia": "domingo"}
+    assert bloco["entorno"]["comercio_rua"][0]["detalhes"] == {"dia": "domingo"}
+
+
 def test_type_without_source_data_is_left_out_of_the_index():
     bloco = service().diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
     assert bloco["tipos"]["praca"]["disponivel"] is False
@@ -197,6 +253,39 @@ def test_ivep_with_default_weights_and_municipal_median():
     assert bloco["ivep"] == pytest.approx(50.0)
     assert bloco["mediana_municipal"] == pytest.approx(50.0)
     assert bloco["categorias"]["mobilidade"]["percentil"] == 50
+
+
+def test_category_without_source_data_stays_out_of_the_ivep():
+    percentis = indicadores({"01": [80, 40, 40, 40, 40, 40], "02": [0] * 6})
+    for dados in percentis.values():
+        del dados[("percentil", "lazer_convivencia", 0)]
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63)["diagnostico"]["vitalidade"]
+    assert bloco["ivep"] == pytest.approx(40.0)  # média das cinco categorias com dados, e não 200/6
+    assert "lazer_convivencia" not in bloco["categorias_no_indice"]
+    assert bloco["categorias"]["lazer_convivencia"]["percentil"] is None
+
+
+def test_ivep_is_empty_when_only_categories_without_data_have_weight():
+    percentis = indicadores({"01": [50] * 6})
+    del percentis["01"][("percentil", "mobilidade", 0)]
+    pesos = {c: 0 for c in CATEGORIAS} | {"mobilidade": 3}
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63, pesos)["diagnostico"]["vitalidade"]
+    assert bloco["ivep"] is None
+
+
+def test_vitality_lists_the_types_behind_each_category():
+    percentis = indicadores({"01": [50] * 6, "02": [10] * 6})
+    percentis["01"] |= {("percentil", "parque_area_verde", 0): 70.0, ("equipamentos", "parque_area_verde", 0): 4,
+                        ("densidade_km2", "parque_area_verde", 0): 0.5,
+                        ("densidade_10k_hab", "parque_area_verde", 0): 0.8}
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63)["diagnostico"]["vitalidade"]
+    tipos = bloco["categorias"]["lazer_convivencia"]["tipos"]
+    assert list(tipos) == ["praca", "parque_area_verde"]
+    assert tipos["parque_area_verde"] == {"percentil": 70.0, "equipamentos": 4, "densidade_km2": 0.5,
+                                          "densidade_10k_hab": 0.8, "disponivel": True, "aviso": None}
+    assert tipos["praca"]["disponivel"] is False and tipos["praca"]["aviso"]
+    todos = [t for c in bloco["categorias"].values() for t in c["tipos"]]
+    assert sorted(todos) == sorted(EQUIPMENT_TYPES)
 
 
 def test_ivep_follows_user_weights():
