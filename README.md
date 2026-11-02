@@ -132,13 +132,19 @@ uv run pytest
 
 Sem uv, instale as dependências com `py -m pip install -r requirements-dev.txt` e troque `uv run` por `py -m`.
 
-Para medir a cobertura das regras de negócio (meta de 70% do RNF11):
+Para medir a cobertura das regras de negócio (meta de 70% do RNF11, a porta que a integração contínua exige):
 
 ```bash
-uv run pytest --cov=geohabita
+uv run pytest -m "not integracao and not e2e" --cov=geohabita --cov-fail-under=70
 ```
 
-Dois marcadores separam os testes que exigem mais que o Python: `integracao` (banco PostGIS real, via `DATABASE_URL`) e `e2e` (interface com Playwright e axe-core, depois de `uv run playwright install chromium firefox`). Os testes `e2e` não precisam de banco: as rotas `/api/*` são respondidas pelos arquivos de `tests/e2e/respostas`, e o axe-core está em `tests/vendor`. Eles auditam as duas telas pelas regras WCAG 2.1 A/AA, testam teclado, região viva, contraste, reflow em 360 px, comparação e exportação, e rodam em mais de um navegador com `uv run pytest -m e2e --browser chromium --browser firefox`. Para regravar as respostas depois de mudar a API, use `uv run --env-file .env scripts/capturar_respostas.py --base http://127.0.0.1:8000` com a aplicação rodando. Para rodar só os de unidade, como o primeiro job da integração contínua: `uv run pytest -m "not integracao and not e2e"`; para um grupo, `uv run pytest -m integracao` ou `uv run pytest -m e2e`.
+Para incluir também a API e os scripts do pipeline no relatório:
+
+```bash
+uv run pytest -m "not e2e" --cov=geohabita --cov=backend --cov=scripts
+```
+
+Três marcadores separam os testes que exigem mais que o Python: `integracao` (banco PostGIS real), `e2e` (interface com Playwright e axe-core, depois de `uv run playwright install chromium firefox`) e os cenários Gherkin das histórias Must em `tests/aceitacao/` (pytest-bdd). Os testes `integracao` criam um banco descartável `geohabita_teste_*` no servidor apontado por `DATABASE_URL` — o usuário precisa poder criar bancos —, aplicam o esquema, inserem dados fictícios e apagam tudo ao fim; o banco de `DATABASE_URL` nunca é alterado. Sem `DATABASE_URL`, eles são pulados. Os testes `e2e` não precisam de banco: as rotas `/api/*` são respondidas pelos arquivos de `tests/e2e/respostas`, e o axe-core está em `tests/vendor`. Eles auditam as duas telas pelas regras WCAG 2.1 A/AA, testam teclado, região viva, contraste, reflow em 360 px, comparação e exportação, e rodam em mais de um navegador com `uv run pytest -m e2e --browser chromium --browser firefox`. Para regravar as respostas depois de mudar a API, use `uv run --env-file .env scripts/capturar_respostas.py --base http://127.0.0.1:8000` com a aplicação rodando. Para rodar só os de unidade, como o primeiro job da integração contínua: `uv run pytest -m "not integracao and not e2e"`; para um grupo, `uv run pytest -m integracao` ou `uv run pytest -m e2e`.
 
 A especificação, os testes e o código são organizados por regra:
 
