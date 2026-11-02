@@ -403,7 +403,7 @@ function linhasCsv(resposta) {
   return linhas;
 }
 
-const baixar = el('button', { type: 'button', class: 'btn-light', text: 'Baixar diagnóstico em CSV' });
+const baixar = el('button', { type: 'button', class: 'btn btn-light', text: 'Baixar diagnóstico em CSV' });
 baixar.addEventListener('click', () => {
   if (!state.dados?.diagnostico) {
     anunciar('Consulte um endereço antes de baixar o CSV.', true);
@@ -549,7 +549,7 @@ $('form-comparar').addEventListener('submit', async (evento) => {
 });
 
 const acoes = el('div', { class: 'acoes-consulta' });
-const fixar = el('button', { type: 'button', class: 'btn-light', text: 'Fixar esta consulta para comparar' });
+const fixar = el('button', { type: 'button', class: 'btn btn-light', text: 'Fixar esta consulta para comparar' });
 fixar.addEventListener('click', fixarConsultaAtual);
 acoes.append(fixar, baixar);
 $('consulta').append(acoes);
