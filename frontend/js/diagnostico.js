@@ -255,7 +255,7 @@ function renderProximidade(p) {
 }
 
 function renderVitalidade(v) {
-  $('ivep').textContent = num.format(v.ivep);
+  $('ivep').textContent = v.ivep == null ? '—' : num.format(v.ivep);
   $('ivep-mediana').textContent = v.mediana_municipal == null ? ''
     : `Mediana dos 96 distritos com os mesmos pesos: ${num.format(v.mediana_municipal)}.`;
   const ul = $('ivep-categorias');
@@ -379,7 +379,7 @@ function linhasCsv(resposta) {
         `${item.nome} · ${minutos(item.distancia_m)} a pé`]);
     }
   }
-  linhas.push(['vitalidade', 'IVEP', d.vitalidade.ivep, 'de 100', 'distrito', '']);
+  linhas.push(['vitalidade', 'IVEP', d.vitalidade.ivep ?? '', 'de 100', 'distrito', '']);
   for (const [categoria, info] of Object.entries(d.vitalidade.categorias)) {
     linhas.push(['vitalidade', 'categoria', categoria, info.percentil ?? '', 'percentil',
       `${info.equipamentos ?? 0} equipamentos · ${info.densidade_km2 ?? ''}/km²`
@@ -635,7 +635,7 @@ async function diagnosticar(alvo, soPesos = false) {
     const d = resposta.diagnostico;
     anunciar(`${soPesos ? 'Índices recalculados' : 'Diagnóstico concluído'} para o distrito ${state.distrito.nome}: `
       + `proximidade ${d.proximidade.ipl == null ? 'sem dados' : num.format(d.proximidade.ipl)}, `
-      + `vitalidade ${num.format(d.vitalidade.ivep)}, de 100.`);
+      + `vitalidade ${d.vitalidade.ivep == null ? 'sem dados' : num.format(d.vitalidade.ivep)}, de 100.`);
     if (!soPesos) {
       $('local-titulo').focus();
       if (alvo.cep) atualizarUrl({ cep: alvo.cep, numero: alvo.numero || '' });

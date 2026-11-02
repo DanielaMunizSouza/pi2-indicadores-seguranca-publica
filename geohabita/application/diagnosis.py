@@ -271,20 +271,25 @@ class DiagnosisService:
     # --- bloco 2: vitalidade (RF08, RF09) -------------------------------------
     def vitality(self, code: str, indicators: Mapping[str, Mapping[tuple[str, str, int], float]],
                  pesos: Mapping[str, int]) -> dict[str, Any]:
-        lista_pesos = [pesos[c] for c in CATEGORIES]
-
-        def ivep(dados: Mapping[tuple[str, str, int], float]) -> float:
-            return public_space_vitality_index([dados.get(("percentil", c, 0), 0.0) for c in CATEGORIES],
-                                               lista_pesos)
+        def ivep(dados: Mapping[tuple[str, str, int], float]) -> float | None:
+            # Categoria sem percentil não tem nenhum tipo na fonte: fica fora da média,
+            # como no IPL, em vez de entrar como oferta zero.
+            presentes = [c for c in CATEGORIES if dados.get(("percentil", c, 0)) is not None]
+            if not sum(pesos[c] for c in presentes):
+                return None
+            return public_space_vitality_index([dados[("percentil", c, 0)] for c in presentes],
+                                               [pesos[c] for c in presentes])
 
         dados = indicators.get(code, {})
-        todos = [ivep(d) for d in indicators.values() if any(k[0] == "percentil" for k in d)]
+        todos = [v for d in indicators.values() if (v := ivep(d)) is not None]
+        indice = ivep(dados)
         categorias = {c: {"percentil": dados.get(("percentil", c, 0)),
                           "equipamentos": dados.get(("equipamentos", c, 0)),
                           "densidade_km2": dados.get(("densidade_km2", c, 0)),
                           "densidade_10k_hab": dados.get(("densidade_10k_hab", c, 0)),
                           "peso": pesos[c]} for c in CATEGORIES}
-        return {"ivep": round(ivep(dados), 1),
+        return {"ivep": round(indice, 1) if indice is not None else None,
+                "categorias_no_indice": [c for c in CATEGORIES if dados.get(("percentil", c, 0)) is not None],
                 "mediana_municipal": round(statistics.median(todos), 1) if todos else None,
                 "categorias": categorias}
 

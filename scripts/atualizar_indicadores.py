@@ -6,7 +6,7 @@ Grava em public.indicador_distrito:
     percentis das duas densidades entre os 96 distritos; o da categoria é a média
     dos percentis dos seus tipos, para que um tipo muito denso (iluminação) não
     afogue os demais. Tipos medidos só por área (iluminação) usam a densidade por
-    km².
+    km². Tipos sem nenhum equipamento na fonte ficam de fora.
   - ocorrencias, por grupo de natureza (RF10) e ano do fato, contando só registros
     georreferenciados atribuídos ao distrito pela rotina de resumo.
 
@@ -52,6 +52,10 @@ def equipment_rows(conn):
                WHERE e.tipo = ANY(%s)
                GROUP BY 1, 2""", (tipos,)):
         contagem[codigo, tipo] = n
+    # Só entram os tipos com dados na fonte. Um tipo ausente (a camada de praças,
+    # recusada pelo GeoSampa) teria 0 em todos os distritos, percentil 50 em todos,
+    # e puxaria a categoria para o meio, como se fosse oferta mediana.
+    tipos = [t for t in tipos if any(tipo == t for _, tipo in contagem)]
     linhas = []
     posicoes_por_tipo = {}
     for tipo in tipos:
@@ -74,6 +78,8 @@ def equipment_rows(conn):
         linhas += [(codigo, "percentil", tipo, 0, posicoes_por_tipo[tipo][codigo]) for tipo in tipos]
     for categoria in CATEGORIES:
         da_categoria = [t for t in tipos if EQUIPMENT_CATEGORY[t] == categoria]
+        if not da_categoria:
+            continue  # categoria sem nenhum tipo na fonte: fica fora do IVEP
         so_densidade = [t for t in da_categoria if t not in SO_AREA]
         for codigo in distritos:
             populacao, area = distritos[codigo]

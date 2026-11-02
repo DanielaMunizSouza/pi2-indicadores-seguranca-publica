@@ -199,6 +199,24 @@ def test_ivep_with_default_weights_and_municipal_median():
     assert bloco["categorias"]["mobilidade"]["percentil"] == 50
 
 
+def test_category_without_source_data_stays_out_of_the_ivep():
+    percentis = indicadores({"01": [80, 40, 40, 40, 40, 40], "02": [0] * 6})
+    for dados in percentis.values():
+        del dados[("percentil", "lazer_convivencia", 0)]
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63)["diagnostico"]["vitalidade"]
+    assert bloco["ivep"] == pytest.approx(40.0)  # média das cinco categorias com dados, e não 200/6
+    assert "lazer_convivencia" not in bloco["categorias_no_indice"]
+    assert bloco["categorias"]["lazer_convivencia"]["percentil"] is None
+
+
+def test_ivep_is_empty_when_only_categories_without_data_have_weight():
+    percentis = indicadores({"01": [50] * 6})
+    del percentis["01"][("percentil", "mobilidade", 0)]
+    pesos = {c: 0 for c in CATEGORIAS} | {"mobilidade": 3}
+    bloco = service(FakeRepository(indicators=percentis)).diagnose_point(-23.55, -46.63, pesos)["diagnostico"]["vitalidade"]
+    assert bloco["ivep"] is None
+
+
 def test_ivep_follows_user_weights():
     percentis = indicadores({"01": [100, 0, 0, 0, 0, 0], "02": [0] * 6})
     pesos = {c: 0 for c in CATEGORIAS} | {"lazer_convivencia": 1}

@@ -45,3 +45,17 @@ def test_iluminacao_e_medida_so_por_area_mas_conta_na_categoria():
     assert SO_AREA == {"iluminacao_publica"}
     agregado = [v for c, i, s, _, v in linhas if c == "01" and i == "equipamentos" and s == "conectividade"]
     assert agregado == [100]
+
+
+def test_tipo_sem_dados_na_fonte_fica_fora_da_categoria():
+    # Nenhuma praça carregada: a categoria é só o percentil dos parques, e não a
+    # média com um 50 artificial (todos os distritos empatados em zero).
+    linhas = equipment_rows(Conn({("01", "parque_area_verde"): 1, ("02", "parque_area_verde"): 10}))
+    assert not [s for _, _, s, _, _ in linhas if s == "praca"]
+    lazer = {c: v for c, i, s, _, v in linhas if i == "percentil" and s == "lazer_convivencia"}
+    assert lazer == {"01": 0.0, "02": 100.0}
+
+
+def test_categoria_sem_nenhum_tipo_na_fonte_nao_tem_percentil():
+    linhas = equipment_rows(Conn({("01", "parque_area_verde"): 1, ("02", "parque_area_verde"): 10}))
+    assert not [s for _, i, s, _, _ in linhas if s == "conectividade"]
