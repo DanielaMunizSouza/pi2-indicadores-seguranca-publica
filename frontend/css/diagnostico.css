@@ -446,3 +446,31 @@ abbr {
     padding: 0 10px;
   }
 }
+
+/* O que conta em cada categoria: detalhes sob a barra, na largura toda. */
+.bar .detalhe-categoria {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+}
+
+.detalhe-categoria summary {
+  cursor: pointer;
+  color: var(--teal-dark);
+  font-weight: 700;
+  width: fit-content;
+  min-height: 24px;
+}
+
+.detalhe-categoria ul, .detalhe-categoria ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.detalhe-categoria li {
+  margin: 3px 0;
+}
+
+.detalhe-categoria .hint {
+  margin: 6px 0 0;
+}

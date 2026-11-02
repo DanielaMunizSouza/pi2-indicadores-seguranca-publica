@@ -210,13 +210,64 @@ function linhaVazia(tbody, colunas, texto) {
   tbody.replaceChildren(el('tr', {}, el('td', { colSpan: colunas, text: texto })));
 }
 
+// ---------- o que conta em cada categoria (detalhes sob as barras) ----------
+const MAIS_PROXIMOS = 5;
+
+/** <details> sob a barra da categoria, com uma linha por tipo de equipamento. */
+function detalhesDaCategoria(rotulo, linhas, extra = null) {
+  return el('details', { class: 'detalhe-categoria' },
+    el('summary', { text: `O que conta em ${rotulo}` }),
+    el('ul', {}, ...linhas),
+    extra);
+}
+
+function linhaDeTipo(tipo, texto, disponivel = true, aviso = null) {
+  return el('li', disponivel ? {} : { class: 'muted' },
+    el('strong', { text: `${TIPOS[tipo]}: ` }),
+    disponivel ? texto : `sem dados na fonte (${aviso || 'camada indisponível'}).`);
+}
+
+function textoProximidade(info) {
+  if (info.pontos_no_raio != null) {
+    return `nota ${num.format(info.nota)} · ${int.format(info.pontos_no_raio)} pontos a até `
+      + `${int.format(info.raio_medida_m)} m (${int.format(info.densidade_km2)}/km²).`;
+  }
+  const nota = `nota ${num.format(info.nota)}`;
+  if (info.distancia_m == null || info.aviso) return `${nota} · ${info.aviso}.`;
+  return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta `
+    + `(${info.tempo_caminhada_min} min a pé).`;
+}
+
+function textoVitalidade(info) {
+  const partes = [`${int.format(info.equipamentos)} no distrito`];
+  if (info.densidade_km2 != null) partes.push(`${num.format(info.densidade_km2)}/km²`);
+  if (info.densidade_10k_hab != null) partes.push(`${num.format(info.densidade_10k_hab)} por 10 mil moradores`);
+  partes.push(`posição ${num.format(info.percentil)} de 100`);
+  return `${partes.join(' · ')}.`;
+}
+
 function renderProximidade(p) {
   $('ipl').textContent = p.ipl == null ? '—' : num.format(p.ipl);
   const ul = $('ipl-categorias');
   ul.replaceChildren();
   for (const [categoria, info] of Object.entries(p.categorias)) {
-    const item = barra(CATEGORIAS[categoria][0], info.nota, { corDaBarra: cor(categoria) });
+    const rotulo = CATEGORIAS[categoria][0];
+    const item = barra(rotulo, info.nota, { corDaBarra: cor(categoria) });
     if (info.nota == null) item.querySelector('.value').title = 'sem dados na fonte';
+    const tipos = Object.entries(p.tipos).filter(([, t]) => t.categoria === categoria);
+    const proximos = (p.entorno[categoria] || []).slice(0, MAIS_PROXIMOS);
+    const extra = proximos.length
+      ? el('div', {},
+        el('p', { class: 'hint', text: (p.entorno[categoria] || []).length > MAIS_PROXIMOS
+          ? `Os ${MAIS_PROXIMOS} mais próximos dos ${p.entorno[categoria].length} a até 1 km (todos na aba Ver como tabela):`
+          : 'Todos a até 1 km:' }),
+        el('ol', {}, ...proximos.map((e) => el('li', {
+          text: `${e.nome || TIPOS[e.tipo]} (${TIPOS[e.tipo]}), ${distancia(e.distancia_m)}`,
+        }))))
+      : el('p', { class: 'hint', text: 'Nenhum equipamento desta categoria a até 1 km.' });
+    item.append(detalhesDaCategoria(rotulo,
+      tipos.map(([tipo, t]) => linhaDeTipo(tipo, t.disponivel ? textoProximidade(t) : '', t.disponivel, t.aviso)),
+      extra));
     ul.append(item);
   }
   const tabela = $('tipos');
@@ -263,7 +314,15 @@ function renderVitalidade(v) {
   const tabela = $('vitalidade');
   tabela.replaceChildren();
   for (const [categoria, info] of Object.entries(v.categorias)) {
-    ul.append(barra(CATEGORIAS[categoria][0], info.percentil, { corDaBarra: cor(categoria), mediana: 50 }));
+    const rotulo = CATEGORIAS[categoria][0];
+    const item = barra(rotulo, info.percentil, { corDaBarra: cor(categoria), mediana: 50 });
+    const tipos = Object.entries(info.tipos || {});
+    if (tipos.length) {
+      item.append(detalhesDaCategoria(rotulo,
+        tipos.map(([tipo, t]) => linhaDeTipo(tipo, t.disponivel ? textoVitalidade(t) : '', t.disponivel, t.aviso)),
+        el('p', { class: 'hint', text: 'A posição da categoria é a média das posições dos tipos com dados.' })));
+    }
+    ul.append(item);
     tabela.append(el('tr', {},
       el('th', { scope: 'row', text: CATEGORIAS[categoria][0] }),
       el('td', { class: 'num', text: info.equipamentos == null ? '—' : int.format(info.equipamentos) }),
