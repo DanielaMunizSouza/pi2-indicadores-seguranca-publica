@@ -58,7 +58,18 @@ navegador ──HTTPS──> borda Cloudflare ──túnel──> cloudflared �
                      (TLS, CDN, DDoS)           └──────────── contêineres no servidor da equipe ────────────┘
 ```
 
-O `cloudflared` abre a conexão de saída até a Cloudflare, então nada no servidor fica exposto: `compose.yml` publica a aplicação e o banco só em `127.0.0.1` (portas `APP_PORT` e `DB_PORT`), para uso local e pelo pgAdmin.
+O `cloudflared` abre a conexão de saída até a Cloudflare, então nada no servidor fica exposto à internet. `compose.yml` publica a aplicação só em `127.0.0.1` (`APP_PORT`). O banco também fica em `127.0.0.1` (`DB_PORT`), a menos que `DB_BIND` aponte outra interface: com `DB_BIND=0.0.0.0`, ou o IP da rede local, outros computadores da rede acessam o banco, sempre com usuário e senha (`scram-sha-256`). Nunca encaminhe essa porta para a internet.
+
+Os dados ficam no volume `geohabita_postgis_data`, que tem nome fixo. Ele é reaproveitado em todo `docker compose up` e sobrevive a `docker compose down`; só `docker compose down -v` o apaga. Para levar um banco existente para o volume, gere um dump e restaure:
+
+```bash
+docker exec <contêiner-antigo> pg_dump -U pi2 -d pi2_seguranca_publica -Fc > geohabita.dump
+docker compose up -d db
+docker cp geohabita.dump geohabita-db-1:/tmp/ && docker exec geohabita-db-1 \
+  pg_restore -U pi2 -d pi2_seguranca_publica --clean --if-exists --no-owner -j 4 /tmp/geohabita.dump
+```
+
+O único erro esperado no restore é "cannot drop extension postgis", porque a imagem cria `postgis_topology` junto. Ele não afeta os dados.
 
 O túnel pode rodar de duas formas. As duas usam o mesmo `compose.yml`:
 
