@@ -1,0 +1,91 @@
+# Implantação do GeoHabita em nuvem híbrida: origem em contêineres no servidor da equipe,
+# publicada pela borda da Cloudflare via Cloudflare Tunnel (seção "Implantação" do README).
+#
+#   docker compose --profile tunel up -d --build          # banco, aplicação e túnel
+#   docker compose --profile pipeline run --rm pipeline   # popula ou atualiza o banco
+#
+# Variáveis lidas de .env (modelo em .env.example). Se POSTGRES_PASSWORD tiver caracteres
+# reservados de URL (@ : / ? #), use uma senha sem eles: ela também entra em DATABASE_URL.
+name: geohabita
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-pi2}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD em .env}@db:5432/${POSTGRES_DB:-pi2_seguranca_publica}
+
+services:
+  db:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pi2_seguranca_publica}
+      POSTGRES_USER: ${POSTGRES_USER:-pi2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD em .env}
+    # Só a própria máquina alcança o banco (pgAdmin, psql); a internet não.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pi2} -d ${POSTGRES_DB:-pi2_seguranca_publica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - geohabita
+
+  app:
+    build: .
+    image: geohabita-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      # O cabeçalho CF-Connecting-IP só é aceito de conexões vindas do cloudflared,
+      # que tem IP fixo na rede abaixo (RNF15). Fixo aqui, e não lido de .env, porque
+      # o valor de .env vale para a execução fora do Docker.
+      GEOHABITA_PROXIES_CONFIAVEIS: 172.28.0.10
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    networks:
+      - geohabita
+
+  pipeline:
+    build: .
+    image: geohabita-app
+    profiles: ["pipeline"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *app-env
+    command: ["python", "scripts/pipeline_dados.py"]
+    volumes:
+      - ./data/raw:/app/data/raw
+    networks:
+      - geohabita
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunel"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      # No painel Zero Trust, o hostname público do túnel aponta para http://app:8000.
+      # Sem ":?" porque o Compose avaliaria a exigência mesmo sem o perfil "tunel";
+      # com o token vazio, o cloudflared encerra com erro e aparece em "docker compose logs".
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      geohabita:
+        ipv4_address: 172.28.0.10
+
+networks:
+  geohabita:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgis_data:

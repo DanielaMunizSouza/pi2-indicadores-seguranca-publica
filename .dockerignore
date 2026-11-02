@@ -1,0 +1,28 @@
+# Ambientes, segredos e caches locais
+.venv
+.env
+.env.*
+!.env.example
+.git
+.github
+.commitcraft
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+.coverage.*
+htmlcov
+relatorios-teste
+
+# Dados baixados e processados (vários GB); o pipeline monta data/raw do host
+data/raw
+data/processed
+data/tmp
+
+# Não fazem parte da imagem
+relatorio
+relatorio_parcial
+tests
+*.log
