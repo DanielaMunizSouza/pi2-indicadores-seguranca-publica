@@ -38,27 +38,76 @@ No Linux, o mesmo comando funciona com Docker Engine e o plugin Compose (pacote 
 
 Cada pessoa terá banco local. No `.env`, aponte DATABASE_URL para esse banco (usuário e senha definidos ali; porta 5433). Depois de aplicar `database/schema.sql`, rode `uv run --env-file .env scripts/pipeline_dados.py`, que baixa e importa as fontes públicas e gera a agregação diária usada pela interface (detalhes na seção Dados). Quem já tem um banco criado antes pode reaplicar `database/schema.sql` com segurança: o arquivo é idempotente e só acrescenta as tabelas e colunas novas. O modelo de dados está em `database/modelo_er.mmd`.
 
+## Implantação (nuvem híbrida)
+
+A aplicação publicada usa nuvem híbrida: a origem (aplicação e banco) roda em contêineres Docker no servidor da equipe e chega à internet pela borda de nuvem da Cloudflare, por meio de um Cloudflare Tunnel. Nenhum plano gratuito de nuvem comporta um PostGIS de vários GB (2,1 milhões de ocorrências e cerca de 663 mil pontos de iluminação) nem a aplicação desse porte; o túnel, por outro lado, é gratuito e dispensa IP público, abertura de portas no roteador e certificado próprio.
+
+```
+navegador ──HTTPS──> borda Cloudflare ──túnel──> cloudflared ──HTTP──> app (FastAPI) ──> db (PostGIS)
+                     (TLS, CDN, DDoS)           └──────────── contêineres no servidor da equipe ────────────┘
+```
+
+O `cloudflared` abre a conexão de saída até a Cloudflare, então nada no servidor fica exposto: `compose.yml` publica a aplicação e o banco só em `127.0.0.1` (portas `APP_PORT` e `DB_PORT`), para uso local e pelo pgAdmin.
+
+Passo a passo, com Docker e o plugin Compose instalados:
+
+1. No painel Zero Trust da Cloudflare, em Networks > Tunnels, crie um túnel do tipo Cloudflared e copie o token exibido no comando de instalação.
+2. Crie `.env` a partir de `.env.example`, defina `POSTGRES_PASSWORD` (sem `@ : / ? #`, porque ela também compõe a URL de conexão) e preencha `CLOUDFLARE_TUNNEL_TOKEN`.
+3. No túnel, adicione um hostname público (por exemplo `geohabita.seudominio.com.br`) com o serviço `http://app:8000`.
+4. Suba banco, aplicação e túnel com um comando:
+
+   ```bash
+   docker compose --profile tunel up -d --build
+   ```
+
+5. Popule o banco (a primeira vez leva de meia hora a uma hora; os arquivos baixados ficam em `data/raw` do servidor):
+
+   ```bash
+   docker compose --profile pipeline run --rm pipeline
+   ```
+
+6. Agende a atualização periódica, por exemplo semanal, no cron do servidor: `0 3 * * 1 cd /caminho/do/projeto && docker compose --profile pipeline run --rm -T pipeline python scripts/pipeline_dados.py --etapas ssp-baixar ssp-carregar resumo indicadores >> pipeline.log 2>&1`. Argumentos depois do nome do serviço substituem o comando inteiro, por isso o comando é repetido antes das opções.
+
+Sem o perfil `tunel`, `docker compose up -d --build` sobe só banco e aplicação, acessível em http://127.0.0.1:8000. O banco de `compose.yml` usa a mesma porta 5433 do Compose de `database/`, que continua funcionando para quem só precisa do banco; pare um antes de subir o outro. Os volumes são diferentes, então o novo banco começa vazio.
+
+O que cada lado cobre:
+
+- Borda da Cloudflare: HTTPS e TLS com certificado gerenciado (RNF08), CDN dos arquivos estáticos e proteção contra DDoS, no plano gratuito (RNF14).
+- Servidor da equipe: contêineres reprodutíveis e implantação em um comando (RNF12), sem custo de hospedagem (RNF14).
+
+Limites assumidos: a disponibilidade depende do servidor da equipe (energia, rede e manutenção); não há réplica nem failover, e a meta de disponibilidade do RNF07 fica como trabalho futuro.
+
+O IP do visitante chega no cabeçalho `CF-Connecting-IP`, usado pelo limite de requisições. Como qualquer cliente pode enviar esse cabeçalho, ele só é aceito de conexões vindas de proxies confiáveis, listados em `GEOHABITA_PROXIES_CONFIAVEIS` (IPs ou CIDRs separados por vírgula; padrão `127.0.0.1,::1`, para o `cloudflared` instalado na mesma máquina). No Compose, o `cloudflared` tem o IP fixo 172.28.0.10 na rede `geohabita`, e `compose.yml` já define esse valor para a aplicação.
+
+## Integração contínua
+
+O workflow `.github/workflows/ci.yml` roda a cada push e pull request, com Python 3.12 e uv:
+
+- `testes`: suíte sem os marcadores `integracao` e `e2e`, com cobertura mínima de 70% em `geohabita` (RNF11).
+- `integracao`: testes marcados com `integracao`, contra um serviço PostGIS 16 com `database/schema.sql` aplicado.
+- `e2e-acessibilidade`: testes marcados com `e2e` (Playwright e axe-core) no Chromium e no Firefox (RNF12); os relatórios em `relatorios-teste/` ficam como artefato.
+- `auditoria`: `pip-audit` sobre as dependências fixadas em `uv.lock` (RNF09).
+- `docker`: build da imagem do `Dockerfile`, sem publicação.
+
 ## Testes
 
 A suíte segue desenvolvimento guiado por testes (TDD): os testes descrevem o comportamento esperado pela especificação de requisitos (`relatorio/requisitos_geohabita.tex`) antes da implementação.
 
-Instale as dependências de desenvolvimento:
+`uv sync` já instala as ferramentas de teste. Execute os testes na raiz do projeto:
 
-```powershell
-py -m pip install -r requirements-dev.txt
+```bash
+uv run pytest
 ```
 
-Execute os testes na raiz do projeto:
-
-```powershell
-py -m pytest
-```
+Sem uv, instale as dependências com `py -m pip install -r requirements-dev.txt` e troque `uv run` por `py -m`.
 
 Para medir a cobertura das regras de negócio (meta de 70% do RNF11):
 
-```powershell
-py -m pytest --cov=geohabita
+```bash
+uv run pytest --cov=geohabita
 ```
+
+Dois marcadores separam os testes que exigem mais que o Python: `integracao` (banco PostGIS real, via `DATABASE_URL`) e `e2e` (interface com Playwright e axe-core, depois de `uv run playwright install chromium firefox`). Para rodar só os de unidade, como o primeiro job da integração contínua: `uv run pytest -m "not integracao and not e2e"`; para um grupo, `uv run pytest -m integracao` ou `uv run pytest -m e2e`.
 
 A especificação, os testes e o código são organizados por regra:
 
