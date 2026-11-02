@@ -1,12 +1,13 @@
 """Infraestrutura dos testes de interface (Playwright).
 
-As rotas `/api/*` são interceptadas com respostas gravadas em `data/tmp/e2e`
-(geradas por `scripts/capturar_respostas.py` a partir de um banco real), para que
-os testes de acessibilidade dependam do contrato da API, não do conteúdo dos
-dados — assim a suíte roda mesmo com o banco vazio.
+As rotas `/api/*` são interceptadas com respostas gravadas em `tests/e2e/respostas`
+(versionadas, geradas por `scripts/capturar_respostas.py` a partir de um banco
+real), para que os testes de acessibilidade dependam do contrato da API e não do
+banco: a suíte roda no CI sem PostGIS. A geometria dos distritos vem de
+`data/reference/distritos_sp.geojson`. Para regravar as respostas:
 
     uv run --env-file .env scripts/capturar_respostas.py --cep 01310-200 --numero 1578
-    uv run pytest -m e2e
+    uv run pytest -m e2e --browser chromium --browser firefox
 """
 
 from __future__ import annotations
@@ -23,12 +24,13 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
-PASTA = RAIZ / "data" / "tmp" / "e2e"
+PASTA = RAIZ / "tests" / "e2e" / "respostas"
+GEOMETRIA = RAIZ / "data" / "reference" / "distritos_sp.geojson"
 AXE = RAIZ / "tests" / "vendor" / "axe.min.js"
 
 pytestmark = pytest.mark.e2e
 
-# rota -> (arquivo em data/tmp/e2e, content-type)
+# rota -> (arquivo em tests/e2e/respostas, content-type)
 ROTAS = {
     "/api/status": ("status", "application/json"),
     "/api/categories": ("categories", "application/json"),
@@ -101,7 +103,7 @@ def simular(base_url: str, alvo) -> None:
             consulta = dict(pair.split("=", 1) for pair in route.request.url.split("?", 1)[-1].split("&")
                             if "=" in pair)
             nome = DIAGNOSTICOS.get(consulta.get("cep", "").replace("-", ""), nome)
-        arquivo = PASTA / f"{nome}.json"
+        arquivo = GEOMETRIA if nome == "geometry" else PASTA / f"{nome}.json"
         if not arquivo.is_file():
             arquivo = PASTA / "diagnostico.json"
         route.fulfill(status=200, content_type=tipo, body=lido(arquivo))

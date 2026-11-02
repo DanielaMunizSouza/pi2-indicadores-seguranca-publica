@@ -1,12 +1,13 @@
 """Gera as respostas simuladas usadas pelos testes de interface (Playwright).
 
 Lê uma API real (banco com o pipeline executado) e grava em `data/tmp/e2e` os
-JSONs de cada rota, com um bairros de casos fixos, para que a suíte `e2e` rode
+JSONs de cada rota, para um conjunto fixo de endereços, para que a suíte `e2e` rode
 sem banco. Rode antes da primeira execução dos testes:
 
     uv run --env-file .env scripts/capturar_respostas.py --cep 01310-200 --numero 1578
 
-Os arquivos gerados não são versionados: são dados locais, regeneráveis.
+Os arquivos são versionados (só dados públicos agregados); regrave quando o
+contrato da API mudar. A geometria dos distritos já está em data/reference.
 """
 import argparse
 import json
@@ -15,9 +16,8 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.app import DB_URL  # noqa: E402
 
-DESTINO = Path("data/tmp/e2e")
+DESTINO = Path(__file__).resolve().parents[1] / "tests" / "e2e" / "respostas"
 BASE = "http://127.0.0.1:8000"
 
 
@@ -50,8 +50,6 @@ def main():
         "areas.json": "/api/areas",
         "limite.json": None,  # preenchido abaixo, com o código do distrito consultado
     }
-    geometry = Path("data/reference/distritos_sp.geojson")
-    (DESTINO / "geometry.json").write_bytes(geometry.read_bytes())
 
     for nome, rota in arquivos.items():
         if rota is None:
