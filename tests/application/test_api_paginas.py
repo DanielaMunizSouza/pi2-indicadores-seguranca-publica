@@ -43,3 +43,16 @@ def test_version_changes_when_a_file_changes(tmp_path):
     antes = api.asset_version(tmp_path)
     arquivo.write_text("a{color:red}", encoding="utf-8")
     assert api.asset_version(tmp_path) != antes
+
+
+@pytest.mark.parametrize("rota", ["/", "/explorar"])
+def test_pages_declare_the_favicon(client, rota):
+    assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml">' in client.get(rota).text
+
+
+@pytest.mark.parametrize("rota", ["/favicon.svg", "/favicon.ico"])
+def test_favicon_is_served_as_svg(client, rota):
+    resposta = client.get(rota)
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "image/svg+xml"
+    assert resposta.text.lstrip().startswith("<svg")

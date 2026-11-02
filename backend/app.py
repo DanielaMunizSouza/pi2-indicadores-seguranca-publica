@@ -142,6 +142,16 @@ def explorar():
     return page("explorar.html")
 
 
+FAVICON = ROOT / "frontend" / "img" / "favicon.svg"
+
+
+# /favicon.ico também: navegadores e leitores de feed pedem esse endereço sem ler o HTML.
+@app.get("/favicon.svg", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(FAVICON, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/status")
 def status():
     return {"banco": "conectado", **occurrence_repository.status()}
