@@ -19,9 +19,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-pi2_seguranca_publica}
       POSTGRES_USER: ${POSTGRES_USER:-pi2}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD em .env}
-    # Só a própria máquina alcança o banco (pgAdmin, psql); a internet não.
+    # Por padrão só a própria máquina alcança o banco (pgAdmin, psql). Com
+    # DB_BIND=0.0.0.0 (ou o IP da interface da rede local) ele fica acessível na
+    # rede local, sempre com senha: conexões de fora do contêiner exigem
+    # scram-sha-256. Nunca publique esta porta na internet; o túnel expõe só o app.
     ports:
-      - "127.0.0.1:${DB_PORT:-5433}:5432"
+      - "${DB_BIND:-127.0.0.1}:${DB_PORT:-5433}:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -92,4 +95,8 @@ networks:
           gateway: 172.28.0.1  # fixo: a aplicação confia no CF-Connecting-IP vindo dele
 
 volumes:
+  # Nome fixo: o mesmo volume é reaproveitado em todo "up", independentemente do
+  # nome da pasta ou do projeto, e sobrevive a "docker compose down". Só
+  # "docker compose down -v" ou "docker volume rm geohabita_postgis_data" o apagam.
   postgis_data:
+    name: geohabita_postgis_data
