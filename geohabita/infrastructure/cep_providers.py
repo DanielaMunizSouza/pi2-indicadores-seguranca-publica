@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import json
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from geohabita.application.address_search import StreetCep
 from geohabita.application.cep_lookup import Address, ProviderError
 from geohabita.domain.territory import SAO_PAULO_IBGE_CODE
 
 VIACEP_URL = "https://viacep.com.br/ws/{cep}/json/"
+VIACEP_STREET_URL = "https://viacep.com.br/ws/SP/S%C3%A3o%20Paulo/{street}/json/"
 BRASILAPI_URL = "https://brasilapi.com.br/api/cep/v2/{cep}"
 SAO_PAULO_CITY_CENTRE = (-23.5475, -46.63611)  # coordenada genérica devolvida pela BrasilAPI
 _HEADERS = {"User-Agent": "GeoHabita/0.1 (projeto integrador UNIVESP)"}
@@ -102,3 +105,18 @@ def brasilapi_coordinates(cep: str, timeout: float = 3.0,
             and abs(address.longitude - SAO_PAULO_CITY_CENTRE[1]) < 1e-4):
         return None
     return address.latitude, address.longitude
+
+
+def parse_viacep_street(data: list | dict | None) -> list[StreetCep]:
+    """Converte a busca reversa do ViaCEP (lista de CEPs do logradouro)."""
+    if not isinstance(data, list):
+        return []
+    return [StreetCep(cep=item["cep"].replace("-", ""), street=item.get("logradouro", ""),
+                      complement=item.get("complemento", ""), neighbourhood=item.get("bairro", ""),
+                      unit=item.get("unidade", ""))
+            for item in data if item.get("ibge") == SAO_PAULO_IBGE_CODE]
+
+
+def viacep_street(street: str, timeout: float = 5.0) -> list[StreetCep]:
+    """CEPs de São Paulo cujo logradouro contém o texto (busca reversa do CEP; RF03)."""
+    return parse_viacep_street(_get_json(VIACEP_STREET_URL.format(street=quote(street)), timeout))
