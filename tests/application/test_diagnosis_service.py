@@ -210,6 +210,14 @@ def test_parque_de_conservacao_aparece_no_entorno_de_lazer():
     assert [e["tipo"] for e in entorno["lazer_convivencia"]] == ["parque_conservacao"]
 
 
+def test_detalhes_de_funcionamento_chegam_ao_tipo_e_ao_entorno():
+    feira = NearbyEquipment("feira_mercado_municipal", "Feira X", 300.0, details={"dia": "domingo"})
+    repo = FakeRepository(available={"feira_mercado_municipal"}, nearest=[feira], within=[feira])
+    bloco = service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
+    assert bloco["tipos"]["feira_mercado_municipal"]["detalhes"] == {"dia": "domingo"}
+    assert bloco["entorno"]["comercio_rua"][0]["detalhes"] == {"dia": "domingo"}
+
+
 def test_type_without_source_data_is_left_out_of_the_index():
     bloco = service().diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
     assert bloco["tipos"]["praca"]["disponivel"] is False

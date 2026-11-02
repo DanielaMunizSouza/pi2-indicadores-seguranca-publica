@@ -260,6 +260,7 @@ class DiagnosisService:
                 "nome": mais_proximo.name if mais_proximo else None,
                 "latitude": mais_proximo.latitude if mais_proximo else None,
                 "longitude": mais_proximo.longitude if mais_proximo else None,
+                "detalhes": mais_proximo.details if mais_proximo else None,
                 "tempo_caminhada_min": walking_time_minutes(distancia) if distancia is not None else None,
                 "ate_500m": sum(1 for e in around if e.type == tipo and e.distance_m <= 500),
                 "ate_1km": sum(1 for e in around if e.type == tipo and e.distance_m <= 1000),
@@ -281,7 +282,8 @@ class DiagnosisService:
         ipl = local_proximity_index(notas, pesos_ipl) if sum(pesos_ipl) else None
         entorno = {
             categoria: [{"tipo": e.type, "nome": e.name, "distancia_m": round(e.distance_m, 1),
-                         "latitude": e.latitude, "longitude": e.longitude} for e in itens]
+                         "latitude": e.latitude, "longitude": e.longitude, "detalhes": e.details}
+                        for e in itens]
             for categoria, itens in within_radius(around, max(LISTING_RADII_M)).items()
         }
         return {"ipl": round(ipl, 1) if ipl is not None else None, "medida": STRAIGHT_LINE_LABEL,

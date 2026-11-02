@@ -70,3 +70,18 @@ def test_parques_de_conservacao_e_naturais_viram_tipo_restrito(pipeline, tmp_pat
                                   "WHERE camada = 'pde_parque_municipal'").fetchall())
     assert tipos == {"Parque 1": "parque_area_verde", "Parque 2": "parque_conservacao",
                      "Parque 3": "parque_conservacao"}
+
+
+def test_feira_carregada_guarda_o_dia(pipeline, tmp_path, url_teste):
+    arquivo = tmp_path / "equipamento_feira_livre.geojson"
+    arquivo.write_text(json.dumps({"type": "FeatureCollection", "features": [{
+        "type": "Feature", "geometry": {"type": "Point", "coordinates": [-46.7, -23.6]},
+        "properties": {"cd_identificador": 9, "nm_equipamento": "FEIRA X", "tx_dia_funcionamento": "QUARTA-FEIRA"}}]}),
+        encoding="utf-8")
+    pipeline.carregar_camada("equipamento_feira_livre", "comercio_rua", "feira_mercado_municipal",
+                             arquivo, SemProgresso())
+    with psycopg.connect(url_teste) as conn:
+        (detalhes,) = conn.execute("SELECT detalhes FROM public.equipamento_publico "
+                                   "WHERE camada = 'equipamento_feira_livre'").fetchone()
+        conn.execute("DELETE FROM public.equipamento_publico WHERE camada = 'equipamento_feira_livre'")
+    assert detalhes == {"dia": "quarta-feira"}

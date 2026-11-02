@@ -116,3 +116,6 @@ ALTER TABLE public.carga_etl ADD COLUMN IF NOT EXISTS registros_fora_do_municipi
 DELETE FROM public.carga_etl a USING public.carga_etl b
  WHERE a.fonte = b.fonte AND a.arquivo = b.arquivo AND a.executada_em < b.executada_em;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_carga_fonte_arquivo ON public.carga_etl(fonte,arquivo);
+-- Detalhes de funcionamento vindos da fonte, quando houver: dia da feira livre,
+-- horário e telefone do mercado municipal. Mostrados ao passar sobre o ponto no mapa.
+ALTER TABLE public.equipamento_publico ADD COLUMN IF NOT EXISTS detalhes jsonb;

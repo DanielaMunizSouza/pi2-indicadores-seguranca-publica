@@ -49,6 +49,7 @@ class NearbyEquipment:
     distance_m: float
     latitude: float | None = None  # ponto do equipamento (ou do contorno mais próximo), para o mapa
     longitude: float | None = None
+    details: dict | None = None  # funcionamento vindo da fonte (dia da feira, horário do mercado)
 
 
 def nearest_by_type(items: Iterable[NearbyEquipment]) -> dict[str, NearbyEquipment]:

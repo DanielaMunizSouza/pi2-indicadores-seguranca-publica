@@ -55,7 +55,10 @@ EQUIPAMENTOS = [
     # Parque de 200 m x 200 m com o centro a 500 m ao sul: o contorno fica a 400 m.
     ("parque_area_verde", "lazer_convivencia", "Parque Teste", quadrado_wkt(-100, -600, 100, -400, multi=False)),
     ("escola_publica", "servicos_essenciais", "Escola Leste", ponto_wkt(leste_m=2_000)),     # em T2
+    ("feira_mercado_municipal", "comercio_rua", "Feira Teste", ponto_wkt(norte_m=-200)),     # 200 m
 ]
+# Detalhes de funcionamento por nome de equipamento (coluna detalhes).
+DETALHES = {"Feira Teste": {"dia": "domingo"}}
 # Pontos de iluminação: 5 a até 300 m da origem e 3 a 500 m.
 ILUMINACAO = [ponto_wkt(leste_m=d) for d in (50, 100, 150, 200, 250)] + \
              [ponto_wkt(norte_m=-500), ponto_wkt(leste_m=-500), ponto_wkt(norte_m=500)]
@@ -81,9 +84,9 @@ def semear(conn) -> None:
                      (codigo, nome, regiao, quadrado_wkt(o, s, l, n), populacao))
     for i, (tipo, categoria, nome, wkt) in enumerate(EQUIPAMENTOS):
         conn.execute("""INSERT INTO public.equipamento_publico
-                        (categoria, tipo, camada, identificador, nome, geometria)
-                        VALUES (%s, %s, 'teste', %s, %s, ST_GeomFromText(%s, 4326))""",
-                     (categoria, tipo, f"eq{i}", nome, wkt))
+                        (categoria, tipo, camada, identificador, nome, geometria, detalhes)
+                        VALUES (%s, %s, 'teste', %s, %s, ST_GeomFromText(%s, 4326), %s::jsonb)""",
+                     (categoria, tipo, f"eq{i}", nome, wkt, json.dumps(DETALHES.get(nome))))
     for i, wkt in enumerate(ILUMINACAO):
         conn.execute("""INSERT INTO public.equipamento_publico
                         (categoria, tipo, camada, identificador, geometria)

@@ -66,7 +66,16 @@ def test_iluminacao_fica_fora_da_busca_de_vizinhos(repo):
 
 def test_tipos_disponiveis_sao_os_carregados(repo):
     assert repo.available_types() == {"unidade_basica_saude", "ponto_onibus", "parque_area_verde",
-                                      "escola_publica", "iluminacao_publica"}
+                                      "escola_publica", "iluminacao_publica", "feira_mercado_municipal"}
+
+
+def test_detalhes_de_funcionamento_chegam_com_o_equipamento(repo):
+    (feira,) = repo.nearest_by_type(*ORIGEM, ["feira_mercado_municipal"])
+    assert feira.details == {"dia": "domingo"}
+    (no_raio,) = repo.equipment_within(*ORIGEM, 500, ["feira_mercado_municipal"])
+    assert no_raio.details == {"dia": "domingo"}
+    (ubs,) = repo.nearest_by_type(*ORIGEM, ["unidade_basica_saude"])
+    assert ubs.details is None
 
 
 def test_populacoes_e_indicadores_por_distrito(repo):

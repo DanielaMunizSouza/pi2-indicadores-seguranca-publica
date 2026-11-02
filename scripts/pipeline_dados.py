@@ -184,10 +184,11 @@ def cep_limpo(valor):
 
 
 SQL_EQUIPAMENTO = (
-    "INSERT INTO public.equipamento_publico (categoria,tipo,camada,identificador,nome,endereco,cep,geometria) "
-    "VALUES (%s,%s,%s,%s,%s,%s,%s,ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326))) "
+    "INSERT INTO public.equipamento_publico (categoria,tipo,camada,identificador,nome,endereco,cep,geometria,detalhes) "
+    "VALUES (%s,%s,%s,%s,%s,%s,%s,ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326)),%s::jsonb) "
     "ON CONFLICT (camada,identificador) DO UPDATE SET categoria=EXCLUDED.categoria,tipo=EXCLUDED.tipo,"
-    "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,importado_em=now()")
+    "nome=EXCLUDED.nome,endereco=EXCLUDED.endereco,cep=EXCLUDED.cep,geometria=EXCLUDED.geometria,"
+    "detalhes=EXCLUDED.detalhes,importado_em=now()")
 
 
 def existe(camada, props) -> bool:
@@ -215,6 +216,29 @@ def tipo_da_feicao(camada, tipo, props) -> str:
     return tipo
 
 
+DIAS = {"SEGUNDA-FEIRA": "segunda-feira", "TERCA-FEIRA": "terça-feira", "QUARTA-FEIRA": "quarta-feira",
+        "QUINTA-FEIRA": "quinta-feira", "SEXTA-FEIRA": "sexta-feira", "SABADO": "sábado", "DOMINGO": "domingo"}
+
+
+def _texto(valor):
+    """Texto da fonte sem espaços repetidos (inclusive não separáveis) nem ponto final."""
+    texto = " ".join(str(valor or "").replace("\xa0", " ").split()).rstrip(".").strip()
+    return None if not texto or texto.upper() in ("NÃO INFORMADO", "NAO INFORMADO", "NONE") else texto
+
+
+def detalhes_da_feicao(camada, props) -> dict | None:
+    """Dia da feira livre; horário e telefone do mercado municipal (quando a fonte traz)."""
+    if camada == "equipamento_feira_livre":
+        dia = _texto(props.get("tx_dia_funcionamento"))
+        return {"dia": DIAS.get(dia.upper(), dia.lower())} if dia else None
+    if camada == "equipamento_mercados_municipais":
+        horario = _texto(props.get("tx_horario_funcionamento"))
+        detalhes = {"horario": horario.capitalize() if horario else None,
+                    "telefone": _texto(props.get("tx_numero_telefone"))}
+        return {k: v for k, v in detalhes.items() if v} or None
+    return None
+
+
 def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
     """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10).
 
@@ -233,7 +257,8 @@ def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
                        primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem",
                                 "nm_trecho_via_bicicleta", "cd_placa", "nm_parque", "nm_terminal_onibus"),
                        primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus", "tx_endereco"),
-                       cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"])))
+                       cep_limpo(primeiro(p, "cd_cep_equipamento")), json.dumps(f["geometry"]),
+                       json.dumps(detalhes_da_feicao(camada, p), ensure_ascii=False)))
     chave = f"eq:{camada}"
     progresso.inicio(chave, f"carregando {camada}", total=len(linhas), silencioso=len(linhas) <= LOTE)
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
