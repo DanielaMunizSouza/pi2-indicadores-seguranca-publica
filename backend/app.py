@@ -12,6 +12,7 @@ from datetime import date
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from geohabita.application.address_search import AddressSearch
 from geohabita.application.cep_lookup import Address, CepLookup, CepNotFoundError, ProviderError
@@ -84,6 +85,10 @@ async def database_error(request: Request, exc: psycopg.Error):
 
 connect = connector(DB_URL)
 occurrence_repository = PostgisOccurrenceRepository(lambda: connect())
+
+
+# CSS e JavaScript da interface: arquivos próprios, servidos como estáticos.
+app.mount("/static", StaticFiles(directory=ROOT / "frontend"), name="static")
 
 
 @app.get("/", include_in_schema=False)
