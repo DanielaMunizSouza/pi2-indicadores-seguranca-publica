@@ -24,7 +24,7 @@ main {
 
 .card-title {
   margin: 0 0 13px;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: #46606c;
@@ -52,13 +52,13 @@ main {
 }
 
 .field label {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: #46606c;
 }
 
 .field legend {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: #46606c;
   padding: 0;
@@ -72,7 +72,7 @@ main {
   padding: 8px 10px;
   background: #fcfdfd;
   color: var(--ink);
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .field.cep-field input {
@@ -87,7 +87,7 @@ main {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--ink);
 }
 
@@ -111,7 +111,7 @@ main {
   background: #f2f6f7;
   border-radius: 9px;
   color: #3d5864;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.45;
 }
 
@@ -153,14 +153,14 @@ main {
 .kpi span {
   display: block;
   color: #4d636d;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 800;
 }
 
 .kpi strong {
   display: block;
   margin-top: 5px;
-  font-size: 24px;
+  font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -168,7 +168,7 @@ main {
   display: block;
   margin-top: 2px;
   color: #4d636d;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .bar-list {
@@ -183,7 +183,7 @@ main {
   grid-template-columns: minmax(90px, 1fr) 1.2fr auto;
   gap: 8px;
   align-items: center;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .bar-name {
@@ -214,7 +214,7 @@ main {
 
 .empty {
   color: #4d636d;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 
@@ -235,13 +235,13 @@ main {
 
 .map-heading h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .map-heading p {
   margin: 4px 0 0;
   color: #4d636d;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .district-count {
@@ -251,7 +251,7 @@ main {
   background: #e3f0ef;
   color: #14655f;
   padding: 7px 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
 }
 
@@ -281,7 +281,7 @@ main {
   border-radius: 8px;
   padding: 7px 12px;
   color: #1d3d4a;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -299,7 +299,7 @@ main {
 }
 
 .legend-title {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: #244654;
   margin-bottom: 8px;
@@ -323,13 +323,13 @@ main {
   gap: 8px;
   margin-top: 5px;
   color: #45606b;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .map-help {
   padding: 10px 6px 2px;
   color: #45606b;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.55;
 }
 
@@ -348,22 +348,22 @@ main {
 .leaflet-popup-content {
   margin: 12px 14px;
   line-height: 1.5;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .popup-title {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   color: #173b4a;
 }
 
 .popup-meta {
   color: #4d636d;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .popup-count {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 900;
   color: #0f6b63;
   font-variant-numeric: tabular-nums;
@@ -374,7 +374,7 @@ main {
   margin: 15px auto 24px;
   padding: 0 20px;
   color: #405863;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.55;
 }
 

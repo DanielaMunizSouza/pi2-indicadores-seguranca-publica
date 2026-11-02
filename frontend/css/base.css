@@ -101,7 +101,7 @@ header {
 .eyebrow {
   margin: 0 0 3px;
   color: #a8e3d6;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -109,7 +109,7 @@ header {
 
 h1 {
   margin: 0;
-  font-size: clamp(21px, 2.2vw, 28px);
+  font-size: clamp(1.3125rem, 1rem + 1.1vw, 1.75rem);
   letter-spacing: -.03em;
 }
 
@@ -126,7 +126,7 @@ h1 {
   border: 1px solid #ffffff59;
   border-radius: 999px;
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
@@ -153,16 +153,16 @@ main {
 }
 
 .card h2 {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .card h3 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .hint {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 6px 0 0;
 }
 
@@ -172,7 +172,7 @@ main {
   border-radius: 9px;
   padding: 9px 16px;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 0.9375rem;
   cursor: pointer;
   background: var(--teal);
   color: #fff;
@@ -199,11 +199,11 @@ main {
 .btn-pequeno {
   min-height: 36px;
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .notice {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: 0;
 }
@@ -223,7 +223,7 @@ main {
 table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 caption {
@@ -240,7 +240,7 @@ th, td {
 }
 
 thead th {
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: .04em;
   color: #405963;
@@ -280,7 +280,7 @@ td.num, th.num {
   grid-template-columns: minmax(120px, 1fr) minmax(80px, 1.4fr) 56px;
   gap: 8px;
   align-items: center;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .track {
@@ -345,7 +345,7 @@ td.num, th.num {
 }
 
 .a11y-bar legend {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: var(--muted);
   padding-right: 6px;
@@ -369,7 +369,7 @@ td.num, th.num {
 }
 
 .a11y-help {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: 0 0 10px;
   padding: 0 20px;
@@ -441,4 +441,9 @@ html.alto-contraste .leaflet-tile {
     animation: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* O Leaflet fixa em px a fonte dos botões de zoom; em rem ela acompanha o controle de fonte. */
+.leaflet-container .leaflet-control-zoom a {
+  font-size: 1.125rem;
 }
