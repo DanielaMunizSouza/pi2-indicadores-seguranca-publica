@@ -1,7 +1,7 @@
 // Tela de diagnóstico do endereço (UC01 a UC04). JavaScript da página, servido
 // como estático; o Leaflet continua global (variável L).
 
-import { $, el, num, int, distancia, minutos, getJSON, corCss, atualizarUrl } from './util.js';
+import { $, el, num, int, distancia, minutos, getJSON, corCss, atualizarUrl, csv, baixarArquivo } from './util.js';
 import { instalarBarraDeAcessibilidade, instalarAtalhos } from './acessibilidade.js';
 
 const CATEGORIAS = {
@@ -344,6 +344,76 @@ async function render(resposta, soPesos) {
   if (!soPesos) await desenharMapa(d);
 }
 
+// ---------- exportação (RF18, versão CSV) ----------
+function linhasCsv(resposta) {
+  const d = resposta.diagnostico;
+  const local = resposta.local;
+  const linhas = [['bloco', 'indicador', 'categoria/tipo/natureza', 'valor', 'unidade', 'detalhe']];
+  const endereco = [local.endereco?.logradouro, local.endereco?.numero && `nº ${local.endereco.numero}`,
+    local.endereco?.bairro, local.endereco?.cep].filter(Boolean).join(', ');
+  linhas.push(['local', 'endereço', endereco, '', '', '']);
+  linhas.push(['local', 'distrito', local.distrito.nome, local.distrito.codigo, '',
+    local.distrito.regiao || '']);
+  linhas.push(['local', 'coordenada', `${local.latitude.toFixed(6)},${local.longitude.toFixed(6)}`,
+    'graus', '', local.origem_coordenada]);
+  linhas.push(['local', 'aviso da coordenada', local.aviso_localizacao || '', '', '', '']);
+  linhas.push(['proximidade', 'IPL', d.proximidade.ipl ?? '', 'de 100',
+    d.proximidade.medida, 'pesos: ' + Object.entries(d.proximidade.categorias)
+      .map(([c, i]) => `${c}=${i.peso}`).join(',')]);
+  for (const [categoria, info] of Object.entries(d.proximidade.categorias)) {
+    linhas.push(['proximidade', 'nota da categoria', categoria, info.nota ?? '', 'de 100', `peso ${info.peso}`]);
+  }
+  for (const [tipo, info] of Object.entries(d.proximidade.tipos)) {
+    const detalhe = info.pontos_no_raio != null
+      ? `${info.pontos_no_raio} pontos no raio de ${info.raio_medida_m} m`
+      : (info.nome || '');
+    linhas.push(['proximidade', 'tipo', tipo, info.nota ?? '', 'de 100',
+      `${detalhe}${info.distancia_m != null ? ` · ${info.distancia_m} m em linha reta` : ''}`
+      + `${info.tempo_caminhada_min != null ? ` · ${info.tempo_caminhada_min} min a pé` : ''}`
+      + `${info.ate_500m != null ? ` · ${info.ate_500m} até 500 m · ${info.ate_1km} até 1 km` : ''}`
+      + `${info.aviso ? ` · ${info.aviso}` : ''}`]);
+  }
+  for (const [categoria, itens] of Object.entries(d.proximidade.entorno)) {
+    for (const item of itens) {
+      linhas.push(['proximidade', 'equipamento no entorno', `${categoria} · ${item.tipo}`, item.distancia_m, 'm',
+        `${item.nome} · ${minutos(item.distancia_m)} a pé`]);
+    }
+  }
+  linhas.push(['vitalidade', 'IVEP', d.vitalidade.ivep, 'de 100', 'distrito', '']);
+  for (const [categoria, info] of Object.entries(d.vitalidade.categorias)) {
+    linhas.push(['vitalidade', 'categoria', categoria, info.percentil ?? '', 'percentil',
+      `${info.equipamentos ?? 0} equipamentos · ${info.densidade_km2 ?? ''}/km²`
+      + ` · ${info.densidade_10k_hab ?? ''}/10 mil hab · peso ${info.peso}`]);
+  }
+  const oc = d.ocorrencias;
+  linhas.push(['ocorrencias', 'janela', oc.janela.join('-'), '', 'anos completos',
+    `população ${oc.populacao}`]);
+  for (const [grupo, item] of Object.entries(oc.naturezas)) {
+    linhas.push(['ocorrencias', 'natureza', grupo, item.taxa_100k_ano ?? '', 'por 100 mil por ano',
+      `${item.ocorrencias} registros${item.taxa_municipal_100k_ano != null
+        ? ` · cidade ${item.taxa_municipal_100k_ano}` : ''}`
+      + `${item.tendencia ? ` · tendência ${item.tendencia}` : ''}`
+      + `${item.mensagem ? ` · ${item.mensagem}` : ''}`]);
+  }
+  linhas.push(['ocorrencias', 'aviso', oc.aviso_subnotificacao, '', '', '']);
+  for (const fonte of resposta.fontes || []) {
+    linhas.push(['fontes', fonte.fonte, fonte.descricao, fonte.data_referencia || '', '',
+      `${fonte.observacao || ''}${fonte.aviso ? ` · ${fonte.aviso}` : ''}${fonte.licenca ? ` · ${fonte.licenca}` : ''}`]);
+  }
+  return linhas;
+}
+
+const baixar = el('button', { type: 'button', class: 'btn-light', text: 'Baixar diagnóstico em CSV' });
+baixar.addEventListener('click', () => {
+  if (!state.dados?.diagnostico) {
+    anunciar('Consulte um endereço antes de baixar o CSV.', true);
+    return;
+  }
+  const ponto = `${state.lat.toFixed(4)}_${state.lon.toFixed(4)}`.replace(/\./g, ',');
+  baixarArquivo(`geohabita-${state.distrito.codigo}-${ponto}.csv`, csv(linhasCsv(state.dados)));
+  anunciar('Arquivo CSV gerado no seu navegador: nada foi enviado nem guardado no servidor.');
+});
+
 // ---------- comparação de até três endereços (RF16, UC05) ----------
 const MAXIMO_COMPARACAO = 3;
 let comparacoes = [];
@@ -478,9 +548,11 @@ $('form-comparar').addEventListener('submit', async (evento) => {
   }
 });
 
+const acoes = el('div', { class: 'acoes-consulta' });
 const fixar = el('button', { type: 'button', class: 'btn-light', text: 'Fixar esta consulta para comparar' });
 fixar.addEventListener('click', fixarConsultaAtual);
-$('consulta').append(fixar);
+acoes.append(fixar, baixar);
+$('consulta').append(acoes);
 
 // ---------- consulta (RF15: resultado e erros na região viva) ----------
 async function diagnosticar(alvo, soPesos = false) {

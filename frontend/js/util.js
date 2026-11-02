@@ -50,6 +50,25 @@ export async function getJSON(url) {
   return data;
 }
 
+/** Linhas de uma tabela; separador ";" e BOM para abrir bem no Excel pt-BR. */
+export function csv(linhas) {
+  const celula = (v) => {
+    const texto = v == null ? '' : String(v);
+    return /[";\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  };
+  return '\ufeff' + linhas.map((linha) => linha.map(celula).join(';')).join('\r\n') + '\r\n';
+}
+
+/** Faz o navegador baixar um texto como arquivo (RF18). */
+export function baixarArquivo(nome, conteudo, tipo = 'text/csv;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nome;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 /** Escreve no histórico do navegador sem recarregar a página (RF17). */
 export function atualizarUrl(parametros) {
   const query = new URLSearchParams();

@@ -91,6 +91,13 @@
   color: var(--teal-dark);
 }
 
+.acoes-consulta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 [role=tablist] {
   display: flex;
   gap: 4px;

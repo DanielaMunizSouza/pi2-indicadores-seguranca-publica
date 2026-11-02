@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.e2e
@@ -141,3 +143,23 @@ def test_reflow_em_360_pixels_sem_violacoes(visitando, axe):
     consulta(page)
     assert page.evaluate("document.documentElement.scrollWidth") <= 372
     assert violacoes(page) == []
+
+
+def test_baixar_csv_produz_arquivo_legivel(visitando):
+    page = visitando("/")
+    consulta(page)
+    with page.expect_download() as captura:
+        page.click("button:has-text('Baixar diagnóstico em CSV')")
+    download = captura.value
+    assert download.suggested_filename.startswith("geohabita-")
+    caminho = download.path()
+    conteudo = Path(caminho).read_text(encoding="utf-8-sig")
+    assert conteudo.splitlines()[0].startswith("bloco;indicador;")
+    linhas = conteudo.splitlines()
+    assert any(linha.startswith("proximidade;IPL;") for linha in linhas)
+    assert any(linha.startswith("vitalidade;IVEP;") for linha in linhas)
+    assert any(linha.startswith("ocorrencias;natureza;") for linha in linhas)
+    assert any(linha.startswith("fontes;") for linha in linhas)
+    ilum = [linha for linha in linhas if linha.startswith("proximidade;tipo;iluminacao_publica;")]
+    assert ilum and "pontos no raio de 300 m" in ilum[0]
+    assert "Diagnóstico concluído" in page.inner_text("#status") or "CSV" in page.inner_text("#status")
