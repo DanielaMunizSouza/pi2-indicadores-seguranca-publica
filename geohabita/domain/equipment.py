@@ -29,6 +29,7 @@ EQUIPMENT_CATEGORY: dict[str, str] = {
     "escola_publica": "servicos_essenciais",
     "wifi_publico": "conectividade",
     LIGHTING_TYPE: "conectividade",
+    "parque_conservacao": "lazer_convivencia",  # variante restrita de parque_area_verde
 }
 
 
@@ -82,3 +83,9 @@ def missing_type_message(max_m: int) -> str:
 def missing_lighting_message(radius_m: int) -> str:
     """Mensagem para entorno sem nenhum ponto de iluminação cadastrado (RN15)."""
     return f"nenhum ponto de iluminação pública a menos de {radius_m} metros"
+
+
+def restricted_access_message(label: str, factor: float) -> str:
+    """Aviso de que o equipamento mais vantajoso é de acesso restrito e vale menos."""
+    return (f"o mais próximo é {label}; conta com {round(factor * 100)}% da nota de um "
+            "equipamento aberto ao público")

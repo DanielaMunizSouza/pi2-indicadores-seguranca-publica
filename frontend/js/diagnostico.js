@@ -16,6 +16,7 @@ const CATEGORIAS = {
 const TIPOS = {
   praca: 'Praça',
   parque_area_verde: 'Parque ou área verde',
+  parque_conservacao: 'Parque de conservação (acesso restrito)',
   biblioteca_centro_cultural: 'Biblioteca ou centro cultural',
   ceu_equipamento_esportivo: 'CEU ou equipamento esportivo',
   ponto_onibus: 'Ponto de ônibus',
@@ -233,6 +234,9 @@ function textoProximidade(info) {
       + `${int.format(info.raio_medida_m)} m (${int.format(info.densidade_km2)}/km²).`;
   }
   const nota = `nota ${num.format(info.nota)}`;
+  if (info.acesso_restrito) {
+    return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta: ${info.aviso}.`;
+  }
   if (info.distancia_m == null || info.aviso) return `${nota} · ${info.aviso}.`;
   return `${nota} · ${info.nome || 'sem nome'}, a ${distancia(info.distancia_m)} em linha reta `
     + `(${info.tempo_caminhada_min} min a pé).`;

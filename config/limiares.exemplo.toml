@@ -20,3 +20,8 @@ wifi_publico = { ideal_m = 400, maxima_m = 1200 }
 
 [densidade]
 iluminacao_publica = { raio_m = 300, zero = 150, cem = 1500 }
+
+# Parques de conservação e naturais (acesso restrito): contam como área verde com
+# a nota multiplicada pelo fator, e no IVEP cada um vale "fator" parque.
+[acesso_restrito]
+parque_conservacao = { fator = 0.3 }

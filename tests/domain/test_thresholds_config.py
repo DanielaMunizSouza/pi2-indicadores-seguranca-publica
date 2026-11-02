@@ -12,10 +12,13 @@ from geohabita.domain.thresholds import (
 
 @pytest.fixture(autouse=True)
 def restaura():
-    from geohabita.domain.thresholds import DENSITY_THRESHOLDS
+    from geohabita.domain.thresholds import DENSITY_THRESHOLDS, RESTRICTED_TYPES
     originals = dict(EQUIPMENT_THRESHOLDS)
     densidades = dict(DENSITY_THRESHOLDS)
+    restritos = dict(RESTRICTED_TYPES)
     yield
+    RESTRICTED_TYPES.clear()
+    RESTRICTED_TYPES.update(restritos)
     EQUIPMENT_THRESHOLDS.clear()
     EQUIPMENT_THRESHOLDS.update(originals)
     DENSITY_THRESHOLDS.clear()
@@ -81,3 +84,35 @@ def test_iluminacao_publica_tem_limiar_proprio_por_densidade():
     assert raio == 300 and zero == 150 and cem == 1500
     nota = lighting_note(lighting_density(0))
     assert nota == 0.0 and lighting_note(lighting_density(424)) > 99.0
+
+
+def test_parque_de_conservacao_conta_como_parque_com_peso_baixo():
+    from geohabita.domain.thresholds import RESTRICTED_TYPES
+    restrito = RESTRICTED_TYPES["parque_conservacao"]
+    assert restrito.base_type == "parque_area_verde"
+    assert 0 < restrito.factor <= 0.5
+
+
+def test_arquivo_ajusta_o_fator_do_acesso_restrito(tmp_path):
+    from geohabita.domain.thresholds import RESTRICTED_TYPES
+    arquivo = tmp_path / "limiares.toml"
+    arquivo.write_text('[acesso_restrito]\nparque_conservacao = { fator = 0.1 }\n', encoding="utf-8")
+    load_thresholds(arquivo)
+    assert RESTRICTED_TYPES["parque_conservacao"].factor == 0.1
+
+
+@pytest.mark.parametrize("conteudo", [
+    '[acesso_restrito]\nparque_conservacao = { fator = 1.5 }\n',
+    '[acesso_restrito]\nparque_conservacao = { fator = "baixo" }\n',
+    '[acesso_restrito]\npraca = { fator = 0.2 }\n',
+])
+def test_fator_invalido_e_recusado(conteudo, tmp_path):
+    arquivo = tmp_path / "limiares.toml"
+    arquivo.write_text(conteudo, encoding="utf-8")
+    with pytest.raises(ThresholdConfigError):
+        load_thresholds(arquivo)
+
+
+def test_exemplo_de_configuracao_e_valido():
+    from pathlib import Path
+    assert load_thresholds(Path(__file__).resolve().parents[2] / "config" / "limiares.exemplo.toml")

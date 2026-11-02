@@ -27,7 +27,7 @@ import cargas  # noqa: E402
 from geohabita.config import DATABASE_URL as DB_URL  # noqa: E402
 from geohabita.domain.equipment import EQUIPMENT_CATEGORY  # noqa: E402
 from geohabita.domain.rates import occurrence_group  # noqa: E402
-from geohabita.domain.thresholds import CATEGORIES, LIGHTING_TYPE, load_thresholds  # noqa: E402
+from geohabita.domain.thresholds import CATEGORIES, LIGHTING_TYPE, RESTRICTED_TYPES, load_thresholds  # noqa: E402
 from geohabita.domain.vitality import category_percentile, percentile_ranks, type_percentile  # noqa: E402
 
 # Tipos medidos apenas pela densidade por área: a oferta por habitante não faz
@@ -52,6 +52,17 @@ def equipment_rows(conn):
                WHERE e.tipo = ANY(%s)
                GROUP BY 1, 2""", (tipos,)):
         contagem[codigo, tipo] = n
+    # Variantes de acesso restrito (parques de conservação) somam no tipo base: na
+    # contagem exibida, inteiras; nas densidades (e daí no percentil), com o fator.
+    peso = defaultdict(float, contagem)  # (distrito, tipo) -> equipamentos ponderados
+    for restrito, regra in RESTRICTED_TYPES.items():
+        for codigo in list(distritos):
+            n = contagem.pop((codigo, restrito), 0)
+            peso.pop((codigo, restrito), None)
+            if n:
+                contagem[codigo, regra.base_type] += n
+                peso[codigo, regra.base_type] += regra.factor * n
+    tipos = [t for t in tipos if t not in RESTRICTED_TYPES]
     # Só entram os tipos com dados na fonte. Um tipo ausente (a camada de praças,
     # recusada pelo GeoSampa) teria 0 em todos os distritos, percentil 50 em todos,
     # e puxaria a categoria para o meio, como se fosse oferta mediana.
@@ -61,10 +72,10 @@ def equipment_rows(conn):
     for tipo in tipos:
         por_area, por_habitante = {}, {}
         for codigo, (populacao, area) in distritos.items():
-            n = contagem[codigo, tipo]
-            dens_area = n / area
+            n, ponderado = contagem[codigo, tipo], peso[codigo, tipo]
+            dens_area = ponderado / area
             por_area[codigo] = dens_area
-            por_habitante[codigo] = n / populacao * 10_000
+            por_habitante[codigo] = ponderado / populacao * 10_000
             linhas += [(codigo, "equipamentos", tipo, 0, n), (codigo, "densidade_km2", tipo, 0, dens_area)]
             if tipo not in SO_AREA:
                 linhas.append((codigo, "densidade_10k_hab", tipo, 0, por_habitante[codigo]))
@@ -90,9 +101,9 @@ def equipment_rows(conn):
             linhas.append((codigo, "equipamentos", categoria, 0,
                            sum(contagem[codigo, t] for t in da_categoria)))
             linhas.append((codigo, "densidade_km2", categoria, 0,
-                           sum(contagem[codigo, t] for t in so_densidade) / area))
+                           sum(peso[codigo, t] for t in so_densidade) / area))
             linhas.append((codigo, "densidade_10k_hab", categoria, 0,
-                           sum(contagem[codigo, t] for t in so_densidade) / populacao * 10_000))
+                           sum(peso[codigo, t] for t in so_densidade) / populacao * 10_000))
     return linhas
 
 

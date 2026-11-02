@@ -59,3 +59,16 @@ def test_tipo_sem_dados_na_fonte_fica_fora_da_categoria():
 def test_categoria_sem_nenhum_tipo_na_fonte_nao_tem_percentil():
     linhas = equipment_rows(Conn({("01", "parque_area_verde"): 1, ("02", "parque_area_verde"): 10}))
     assert not [s for _, i, s, _, _ in linhas if s == "conectividade"]
+
+
+def test_parque_de_conservacao_soma_no_parque_com_peso_reduzido():
+    # 01: 1 parque aberto; 02: 2 parques de conservação (valem 0,6 parque ponderado).
+    linhas = equipment_rows(Conn({("01", "parque_area_verde"): 1, ("02", "parque_conservacao"): 2}))
+
+    def valor(indicador, sub, cod):
+        return next(v for c, i, s, _, v in linhas if c == cod and i == indicador and s == sub)
+    assert not [s for _, _, s, _, _ in linhas if s == "parque_conservacao"]
+    assert valor("equipamentos", "parque_area_verde", "02") == 2  # a contagem exibida é inteira
+    assert valor("densidade_km2", "parque_area_verde", "02") == pytest.approx(0.6 / 20.0)
+    # 01: 1 parque em 10 km² (0,1/km²) > 02: 0,6 em 20 km² (0,03/km²).
+    assert valor("percentil", "parque_area_verde", "01") > valor("percentil", "parque_area_verde", "02")

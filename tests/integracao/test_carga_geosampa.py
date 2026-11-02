@@ -57,3 +57,16 @@ def test_recarga_apaga_o_que_saiu_da_fonte(pipeline, tmp_path, url_teste):
     # O parque 3 passou a constar como proposto: some do banco na carga seguinte.
     pipeline.carregar_camada(*args, gravar(tmp_path, [parque(1, "Existente"), parque(3, "Proposto")]), SemProgresso())
     assert parques_no_banco(url_teste) == ["Parque 1"]
+
+
+def test_parques_de_conservacao_e_naturais_viram_tipo_restrito(pipeline, tmp_path, url_teste):
+    arquivo = gravar(tmp_path, [parque(1, "Existente", "Parque Urbano"),
+                                parque(2, "Existente", "Parque de Conservação"),
+                                parque(3, "Existente", "Parque Natural")])
+    pipeline.carregar_camada("pde_parque_municipal", "lazer_convivencia", "parque_area_verde",
+                             arquivo, SemProgresso())
+    with psycopg.connect(url_teste) as conn:
+        tipos = dict(conn.execute("SELECT nome, tipo FROM public.equipamento_publico "
+                                  "WHERE camada = 'pde_parque_municipal'").fetchall())
+    assert tipos == {"Parque 1": "parque_area_verde", "Parque 2": "parque_conservacao",
+                     "Parque 3": "parque_conservacao"}

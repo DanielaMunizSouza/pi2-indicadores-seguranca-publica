@@ -202,6 +202,19 @@ def existe(camada, props) -> bool:
     return True
 
 
+# Categorias do Plano Diretor cujo foco é a proteção ambiental, com visitação restrita
+# ou controlada: viram "parque_conservacao", que conta com peso reduzido (thresholds.py).
+PARQUES_RESTRITOS = {"Parque de Conservação", "Parque Natural"}
+
+
+def tipo_da_feicao(camada, tipo, props) -> str:
+    """Tipo de equipamento da feição; separa os parques de acesso restrito."""
+    if camada == "pde_parque_municipal" and \
+            props.get("tx_tipo_categoria_parque_unidade_conservacao") in PARQUES_RESTRITOS:
+        return "parque_conservacao"
+    return tipo
+
+
 def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
     """Carrega uma camada e devolve quantos equipamentos ficaram no banco (RN10).
 
@@ -216,7 +229,7 @@ def carregar_camada(camada, categoria, tipo, arquivo, progresso) -> int:
         p = f["properties"]
         ident = primeiro(p, "cd_identificador", "cd_identificador_ponto_onibus", "cd_identificador_ciclovia",
                          "cd_identificador_iluminacao_publica", "cd_equipamento") or f.get("id") or str(i)
-        linhas.append((categoria, tipo, camada, ident,
+        linhas.append((categoria, tipo_da_feicao(camada, tipo, p), camada, ident,
                        primeiro(p, "nm_equipamento", "nm_ponto_onibus", "nm_estacao_metro_trem",
                                 "nm_trecho_via_bicicleta", "cd_placa", "nm_parque", "nm_terminal_onibus"),
                        primeiro(p, "tx_endereco_equipamento", "tx_endereco_ponto_onibus", "tx_endereco"),

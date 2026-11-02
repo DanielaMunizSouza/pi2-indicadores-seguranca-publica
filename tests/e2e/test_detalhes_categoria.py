@@ -80,3 +80,19 @@ def test_detalhes_abertos_sem_violacoes(visitando, axe):
     for resumo in page.locator("#ipl-categorias summary").all():
         resumo.click()
     assert violacoes(page, "#painel-proximidade") == []
+
+
+def test_parque_de_acesso_restrito_e_identificado(api):
+    resposta = json.loads((PASTA / "diagnostico.json").read_text(encoding="utf-8"))
+    parque = resposta["diagnostico"]["proximidade"]["tipos"]["parque_area_verde"]
+    parque |= {"nome": "Campo Cerrado", "distancia_m": 120.0, "nota": 30.0, "acesso_restrito": True,
+               "aviso": "o mais próximo é parque de conservação ou natural, de acesso restrito; "
+                        "conta com 30% da nota de um equipamento aberto ao público"}
+    api.route("**/api/diagnostico*", lambda route: route.fulfill(
+        status=200, content_type="application/json", body=json.dumps(resposta)))
+    api.goto(f"{api.base_url}/")
+    consulta(api)
+    detalhe = api.locator("#ipl-categorias details", has_text="Lazer e convivência")
+    detalhe.locator("summary").click()
+    texto = detalhe.inner_text()
+    assert "Campo Cerrado" in texto and "acesso restrito" in texto and "30%" in texto

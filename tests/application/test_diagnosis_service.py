@@ -162,6 +162,54 @@ def test_type_beyond_the_maximum_distance_gets_zero_and_a_message():
     assert tipo["aviso"] == "nenhum equipamento deste tipo a menos de 2000 metros"
 
 
+COM_CONSERVACAO = {"parque_area_verde", "parque_conservacao", "ponto_onibus"}
+
+
+def parques(aberto=None, conservacao=None):
+    itens = []
+    if aberto is not None:
+        itens.append(NearbyEquipment("parque_area_verde", "Parque Aberto", aberto))
+    if conservacao is not None:
+        itens.append(NearbyEquipment("parque_conservacao", "Parque Conservação", conservacao))
+    return itens
+
+
+def tipo_parque(nearest, available=COM_CONSERVACAO):
+    repo = FakeRepository(available=available, nearest=nearest, within=nearest)
+    return service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]["tipos"]["parque_area_verde"]
+
+
+def test_parque_de_conservacao_ao_lado_vale_pouco():
+    tipo = tipo_parque(parques(conservacao=100.0))  # sem parque aberto até 1,2 km
+    assert tipo["nota"] == pytest.approx(30.0)  # 100 x fator 0,3
+    assert tipo["acesso_restrito"] is True and tipo["nome"] == "Parque Conservação"
+    assert "acesso restrito" in tipo["aviso"] and "30%" in tipo["aviso"]
+
+
+def test_parque_aberto_vence_quando_da_nota_maior():
+    tipo = tipo_parque(parques(aberto=700.0, conservacao=50.0))  # aberto: nota 62,5; restrito: 30
+    assert tipo["nota"] == pytest.approx(62.5)
+    assert tipo["acesso_restrito"] is False and tipo["nome"] == "Parque Aberto"
+    assert tipo["aviso"] is None
+
+
+def test_restrito_so_melhora_a_nota_quando_o_aberto_esta_longe():
+    tipo = tipo_parque(parques(aberto=1150.0, conservacao=200.0))  # aberto: 6,25; restrito: 30
+    assert tipo["nota"] == pytest.approx(30.0) and tipo["acesso_restrito"] is True
+
+
+def test_so_parque_de_conservacao_carregado_ainda_conta():
+    tipo = tipo_parque(parques(conservacao=100.0), available={"parque_conservacao"})
+    assert tipo["disponivel"] is True and tipo["nota"] == pytest.approx(30.0)
+
+
+def test_parque_de_conservacao_aparece_no_entorno_de_lazer():
+    repo = FakeRepository(available=COM_CONSERVACAO, nearest=parques(conservacao=100.0),
+                          within=parques(conservacao=100.0))
+    entorno = service(repo).diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]["entorno"]
+    assert [e["tipo"] for e in entorno["lazer_convivencia"]] == ["parque_conservacao"]
+
+
 def test_type_without_source_data_is_left_out_of_the_index():
     bloco = service().diagnose_point(-23.55, -46.63)["diagnostico"]["proximidade"]
     assert bloco["tipos"]["praca"]["disponivel"] is False
