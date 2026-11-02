@@ -13,18 +13,20 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from geohabita.application.address_search import AddressSearch
 from geohabita.application.cep_lookup import Address, CepLookup, CepNotFoundError, ProviderError
 from geohabita.application.diagnosis import DiagnosisService, LocationNotFoundError
 from geohabita.application.geocoding import CachedGeocoder, decode_point, encode_point
 from geohabita.application.rate_limit import RateLimiter
 from geohabita.config import DATABASE_URL as DB_URL, ROOT, TRUSTED_PROXIES, is_trusted
+from geohabita.domain.address import InvalidAddressError
 from geohabita.domain.cep import InvalidCepError, require_valid_cep
 from geohabita.domain.ssp import DATASET_LABELS as CATEGORIES, rate_per_100k
 from geohabita.domain.territory import APPROXIMATE_LOCATION_NOTICE, OUT_OF_CITY_MESSAGE, is_sao_paulo
 from geohabita.infrastructure.cache import PersistentCache
-from geohabita.infrastructure.cep_providers import brasilapi, brasilapi_coordinates, viacep
+from geohabita.infrastructure.cep_providers import brasilapi, brasilapi_coordinates, viacep, viacep_street
 from geohabita.infrastructure.database import DatabaseUnavailable, connector
-from geohabita.infrastructure.nominatim import NominatimGeocoder
+from geohabita.infrastructure.nominatim import NominatimClient, NominatimGeocoder, free_search
 from geohabita.infrastructure.ocorrencias import OccurrenceFilter, PostgisOccurrenceRepository
 from geohabita.infrastructure.postgis import PostgisDiagnosisRepository
 
@@ -132,11 +134,30 @@ def point_cache(namespace: str) -> PersistentCache:
     return PersistentCache(connect, namespace, encode=encode_point, decode=decode_point)
 
 
+# Um só cliente do Nominatim, para que todos os usos respeitem 1 requisição por segundo.
+nominatim = NominatimClient()
 diagnosis_service = DiagnosisService(diagnosis_repository, cep_service, geocoders=[
+    # Com o número do imóvel, a posição do próprio número vem antes de todas as outras.
+    ("openstreetmap_numero", NominatimGeocoder(client=nominatim, house_number=True,
+                                               cache=point_cache("nominatim_numero"))),
     ("brasilapi", CachedGeocoder(lambda endereco: brasilapi_coordinates(endereco.cep, raise_errors=True),
                                  point_cache("brasilapi"), key=lambda endereco: endereco.cep)),
     ("registros_ssp", lambda endereco: diagnosis_repository.cep_centroid(endereco.cep, endereco.street)),
-    ("openstreetmap", NominatimGeocoder(cache=point_cache("nominatim")))])
+    ("openstreetmap", NominatimGeocoder(client=nominatim, cache=point_cache("nominatim")))])
+
+# Busca por endereço e busca reversa do CEP (RF03): ViaCEP, com o Nominatim de reserva.
+address_search = AddressSearch(viacep_street, lambda texto: free_search(nominatim, texto),
+                               cache=PersistentCache(connect, "viacep_logradouro"))
+
+
+@app.get("/api/enderecos")
+def enderecos(logradouro: str = Query(..., description="Nome da rua, avenida etc. (ao menos 3 letras)."),
+              numero: str | None = Query(None, description="Número do imóvel, para escolher o CEP do trecho.")):
+    """Endereços de São Paulo para o logradouro, com o CEP de cada trecho de numeração."""
+    try:
+        return address_search.search(logradouro, numero)
+    except InvalidAddressError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetros os confunde
@@ -145,6 +166,7 @@ def peso():  # um Query novo por parâmetro: o mesmo objeto em vários parâmetr
 
 @app.get("/api/diagnostico")
 def diagnostico(cep: str | None = Query(None, description="CEP do endereço (8 dígitos)."),
+                numero: str | None = Query(None, description="Número do imóvel (opcional, só com CEP)."),
                 lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180),
                 peso_lazer_convivencia: int = peso(), peso_cultura_esporte: int = peso(),
                 peso_mobilidade: int = peso(), peso_comercio_rua: int = peso(),
@@ -157,7 +179,7 @@ def diagnostico(cep: str | None = Query(None, description="CEP do endereço (8 d
         raise HTTPException(400, "Informe o CEP ou a latitude e a longitude.")
     try:
         if cep is not None:
-            return diagnosis_service.diagnose_cep(cep, pesos)
+            return diagnosis_service.diagnose_cep(cep, pesos, numero)
         return diagnosis_service.diagnose_point(lat, lon, pesos)
     except InvalidCepError as exc:
         raise HTTPException(400, str(exc)) from exc
