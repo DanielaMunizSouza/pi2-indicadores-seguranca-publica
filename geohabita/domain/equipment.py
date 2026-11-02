@@ -26,6 +26,14 @@ EQUIPMENT_CATEGORY: dict[str, str] = {
     "unidade_basica_saude": "servicos_essenciais",
     "escola_publica": "servicos_essenciais",
     "wifi_publico": "conectividade",
+    "iluminacao_publica": "conectividade",
+}
+
+
+# Tipos que compõem cada categoria do IPL e do IVEP (derivado do mapa acima).
+CATEGORIA_TYPES: dict[str, list[str]] = {
+    categoria: [t for t, c in EQUIPMENT_CATEGORY.items() if c == categoria]
+    for categoria in dict.fromkeys(EQUIPMENT_CATEGORY.values())
 }
 
 
@@ -67,3 +75,8 @@ def within_radius(
 def missing_type_message(max_m: int) -> str:
     """Mensagem para tipo sem equipamento a menos de ``max_m`` metros (RN15)."""
     return f"nenhum equipamento deste tipo a menos de {max_m} metros"
+
+
+def missing_lighting_message(radius_m: int) -> str:
+    """Mensagem para entorno sem nenhum ponto de iluminação cadastrado (RN15)."""
+    return f"nenhum ponto de iluminação pública a menos de {radius_m} metros"

@@ -31,7 +31,32 @@ CATEGORIES: tuple[str, ...] = (
 )
 
 
-# Limiares iniciais por tipo de equipamento (Quadro de limiares; RN13).
+# Iluminação pública não entra neste quadro: ela é medida pela densidade de
+# pontos no entorno (geohabita/domain/lighting.py), porque a distância até a
+# luminária mais próxima não distinguiria um distrito de outro.
+
+# Tipos medidos por densidade, que não têm par de limiares de distância.
+DENSITY_TYPES: frozenset[str] = frozenset({"iluminacao_publica"})
+
+# Todos os tipos do modelo de indicadores, na ordem de exibição: os medidos por
+# densidade vêm antes dos de distância dentro da sua categoria.
+EQUIPMENT_TYPES: dict[str, str] = {
+    "praca": "lazer_convivencia",
+    "parque_area_verde": "lazer_convivencia",
+    "biblioteca_centro_cultural": "cultura_esporte",
+    "ceu_equipamento_esportivo": "cultura_esporte",
+    "ponto_onibus": "mobilidade",
+    "estacao_metro_trem": "mobilidade",
+    "ciclovia": "mobilidade",
+    "feira_mercado_municipal": "comercio_rua",
+    "unidade_basica_saude": "servicos_essenciais",
+    "escola_publica": "servicos_essenciais",
+    "iluminacao_publica": "conectividade",
+    "wifi_publico": "conectividade",
+}
+
+# Limiares iniciais por tipo de equipamento medido por distância (Quadro de
+# limiares; RN13).
 EQUIPMENT_THRESHOLDS: dict[str, DistanceThreshold] = {
     "praca": DistanceThreshold(400, 1200),
     "parque_area_verde": DistanceThreshold(400, 1200),

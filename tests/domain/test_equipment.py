@@ -14,12 +14,24 @@ from geohabita.domain.equipment import (
     nearest_by_type,
     within_radius,
 )
-from geohabita.domain.thresholds import CATEGORIES, EQUIPMENT_THRESHOLDS
+from geohabita.domain.thresholds import (
+    CATEGORIES,
+    DENSITY_TYPES,
+    EQUIPMENT_THRESHOLDS,
+    EQUIPMENT_TYPES,
+)
 
 
-def test_every_threshold_type_has_a_known_category():
-    assert set(EQUIPMENT_CATEGORY) == set(EQUIPMENT_THRESHOLDS)
+def test_every_type_has_a_known_category():
+    # Todo tipo é medido por distância (quadro de limiares) ou por densidade.
+    assert set(EQUIPMENT_CATEGORY) == set(EQUIPMENT_TYPES)
+    assert set(EQUIPMENT_THRESHOLDS) | set(DENSITY_TYPES) == set(EQUIPMENT_TYPES)
     assert set(EQUIPMENT_CATEGORY.values()) <= set(CATEGORIES)
+
+
+def test_lighting_is_measured_by_density_not_distance():
+    assert "iluminacao_publica" in DENSITY_TYPES
+    assert "iluminacao_publica" not in EQUIPMENT_THRESHOLDS
 
 
 def test_every_category_has_at_least_one_type():
